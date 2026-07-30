@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.egg
+*.pyo
+*.pyd
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Secrets — NEVER commit these
+backend/.env
+systemd/hsm.env
+
+# Data files — generated at runtime
+backend/data/
+data/
+
+# Node.js
+frontend/node_modules/
+frontend/dist/
+frontend/.astro/
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Temporary
+*.tmp
+*.bak
