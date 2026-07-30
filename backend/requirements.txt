@@ -1,0 +1,25 @@
+# Core web framework
+falcon==4.0.2
+
+# WSGI server (single worker for SQLite safety)
+gunicorn==23.0.0
+
+# JWT handling
+PyJWT==2.10.1
+
+# Google OAuth token exchange (no heavy oauth lib needed — pure stdlib)
+# urllib.request is used directly for minimal footprint
+
+# LXD API client (Linux only — not installed on Windows dev; mocked instead)
+# Uncomment on Linux/WSL:
+# pylxd==2.3.2
+
+# Time series database
+tinyflux==1.2.0
+
+# Environment variable loading
+python-dotenv==1.0.1
+
+# Testing (not needed in production)
+pytest==8.3.5
+pytest-mock==3.14.0
