@@ -1,0 +1,437 @@
+---
+/**
+ * Container detail page — handles all /containers/* routes.
+ * 
+ * Since this is a static Astro site, we can't use dynamic [name].astro with
+ * getStaticPaths (we don't know container names at build time).
+ * 
+ * Solution: This page handles /containers/detail and extracts the container name
+ * from the URL query parameter ?name=... set by the dashboard links.
+ * Alternatively, we use a JS redirect: dashboard links go to /containers/[name]
+ * and this page reads window.location.pathname.
+ * 
+ * We use the route /containers/detail?name=containerName approach for static builds.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Container Detail">
+  <div class="page-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <a href="/dashboard" class="back-link">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+            <path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06z"/>
+          </svg>
+          Dashboard
+        </a>
+        <span style="color:var(--border-strong)">/</span>
+        <h1 class="page-title" id="container-title" style="font-size:18px;font-family:'JetBrains Mono',monospace;">Loading...</h1>
+        <span id="status-badge"></span>
+      </div>
+      <p class="page-subtitle" id="container-meta">Loading...</p>
+    </div>
+    <div id="action-buttons" style="display:flex;gap:8px;"></div>
+  </div>
+
+  <div class="detail-layout">
+    <!-- Left column -->
+    <div class="detail-main">
+      <!-- Metrics chart -->
+      <div class="card" id="chart-card">
+        <div class="card-toolbar">
+          <h2 class="card-section-title">Performance History</h2>
+          <div class="range-tabs" id="range-tabs">
+            <button class="range-tab active" data-range="1h">1H</button>
+            <button class="range-tab" data-range="6h">6H</button>
+            <button class="range-tab" data-range="24h">24H</button>
+            <button class="range-tab" data-range="7d">7D</button>
+          </div>
+        </div>
+        <div id="chart-container" style="width:100%;height:200px;margin-top:16px;"></div>
+        <p id="chart-empty" class="chart-empty" style="display:none;">No historical data yet. Metrics are collected every 10 seconds.</p>
+      </div>
+
+      <!-- Terminal -->
+      <div class="card">
+        <h2 class="card-section-title" style="margin-bottom:12px;">Terminal</h2>
+        <div id="terminal-disabled" class="terminal-notice" style="display:none;">
+          Container must be Running to execute commands.
+        </div>
+        <div id="terminal-ui">
+          <div id="terminal-output" class="terminal-output" aria-live="polite" aria-label="Terminal output">
+            <span class="terminal-line terminal-info">Ready. Type a command and press Enter.</span>
+          </div>
+          <form id="terminal-form" class="terminal-input-row" autocomplete="off">
+            <span class="terminal-prompt">$</span>
+            <input
+              type="text"
+              id="terminal-input"
+              class="terminal-input"
+              placeholder="ls -la /home"
+              maxlength="4096"
+              spellcheck="false"
+              aria-label="Terminal command input"
+            />
+            <button type="submit" class="btn btn-sm btn-secondary" id="terminal-submit">Run</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="detail-sidebar">
+      <div class="card">
+        <h2 class="card-section-title" style="margin-bottom:14px;">Live Stats</h2>
+        <div class="stat-item"><span class="stat-item-label">CPU</span><span class="stat-item-value" id="stat-cpu">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">RAM</span><span class="stat-item-value" id="stat-ram">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Net ↓</span><span class="stat-item-value" id="stat-net-rx">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Net ↑</span><span class="stat-item-value" id="stat-net-tx">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Processes</span><span class="stat-item-value" id="stat-procs">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">IP</span><span class="stat-item-value" id="stat-ip" style="font-family:'JetBrains Mono',monospace;font-size:11px;">—</span></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-section-title" style="margin-bottom:14px;">Configuration</h2>
+        <div class="stat-item"><span class="stat-item-label">Image</span><span class="stat-item-value" id="cfg-image">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">CPU Limit</span><span class="stat-item-value" id="cfg-cpu">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">RAM Limit</span><span class="stat-item-value" id="cfg-ram">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Disk Limit</span><span class="stat-item-value" id="cfg-disk">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Profiles</span><span class="stat-item-value" id="cfg-profiles">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Autostart</span><span class="stat-item-value" id="cfg-autostart">—</span></div>
+        <div class="stat-item"><span class="stat-item-label">Created</span><span class="stat-item-value" id="cfg-created" style="font-size:11px;">—</span></div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .back-link {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 13px; color: var(--text-secondary);
+    text-decoration: none; transition: color var(--transition-fast);
+  }
+  .back-link:hover { color: var(--text-primary); }
+
+  .detail-layout {
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    gap: 16px;
+  }
+
+  @media (max-width: 900px) { .detail-layout { grid-template-columns: 1fr; } }
+
+  .detail-main { display: flex; flex-direction: column; gap: 16px; }
+  .detail-sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .card-toolbar { display: flex; align-items: center; justify-content: space-between; }
+
+  .card-section-title {
+    font-size: 14px; font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  .range-tabs {
+    display: flex;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 2px; gap: 2px;
+  }
+
+  .range-tab {
+    background: none; border: none;
+    padding: 4px 12px; font-size: 12px; font-weight: 500;
+    font-family: inherit; color: var(--text-muted);
+    cursor: pointer; border-radius: 5px;
+    transition: all var(--transition-fast);
+  }
+
+  .range-tab:hover { color: var(--text-secondary); }
+  .range-tab.active { background: var(--bg-elevated); color: var(--text-primary); }
+
+  .chart-empty { padding: 40px; text-align: center; font-size: 13px; color: var(--text-muted); }
+
+  .terminal-notice {
+    padding: 20px; text-align: center; font-size: 13px; color: var(--text-muted);
+    background: var(--bg-tertiary); border-radius: var(--radius-md);
+  }
+
+  .terminal-output {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px; height: 280px; overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; line-height: 1.6; margin-bottom: 10px;
+    white-space: pre-wrap; word-break: break-all;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+  }
+
+  .terminal-line { display: block; }
+  .terminal-info    { color: var(--text-muted); }
+  .terminal-command { color: var(--accent-blue-light); }
+  .terminal-stdout  { color: var(--text-primary); }
+  .terminal-stderr  { color: var(--accent-red); }
+  .terminal-exit    { color: var(--text-muted); font-style: italic; }
+
+  .terminal-input-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md); padding: 8px 12px;
+    transition: border-color var(--transition-fast);
+  }
+
+  .terminal-input-row:focus-within { border-color: var(--accent-blue); }
+
+  .terminal-prompt { color: var(--accent-green); font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+
+  .terminal-input {
+    flex: 1; background: none; border: none; outline: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-primary);
+  }
+
+  .terminal-input::placeholder { color: var(--text-muted); }
+
+  .stat-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--border-subtle); gap: 8px;
+  }
+  .stat-item:last-child { border-bottom: none; }
+  .stat-item-label { font-size: 12px; color: var(--text-muted); font-weight: 500; flex-shrink: 0; }
+  .stat-item-value { font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: right; }
+</style>
+
+<script>
+  // Extract container name from URL path: /containers/web-server → "web-server"
+  // OR from query param: /containers/detail?name=web-server
+  function getContainerName() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('name')) return params.get('name');
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    // pathParts = ["containers", "detail"] or ["containers", "web-server"]
+    const last = pathParts[pathParts.length - 1];
+    if (last && last !== 'detail' && last !== 'containers') return last;
+    return null;
+  }
+
+  const containerName = getContainerName();
+
+  if (!containerName) {
+    window.location.href = '/dashboard';
+  }
+
+  let pollTimer = null;
+  let chartInstance = null;
+  let commandHistory = [];
+  let historyIndex = -1;
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes/1024).toFixed(1)} KB`;
+    return `${(bytes/1024/1024).toFixed(1)} MB`;
+  }
+
+  async function loadContainer() {
+    try {
+      const res = await fetch(`/api/containers/${containerName}`);
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (res.status === 403) { window.location.href = '/403'; return; }
+      if (!res.ok) { window.location.href = '/dashboard'; return; }
+
+      const c = await res.json();
+
+      document.getElementById('container-title').textContent = containerName;
+      document.getElementById('container-meta').textContent = `${c.image}  •  Created ${new Date(c.created_at).toLocaleDateString()}`;
+
+      const statusMap = { Running: 'badge-running', Stopped: 'badge-stopped', Frozen: 'badge-frozen', Error: 'badge-error' };
+      document.getElementById('status-badge').innerHTML = `<span class="badge ${statusMap[c.status] || 'badge-stopped'}">${c.status}</span>`;
+
+      document.getElementById('cfg-image').textContent = c.image || '—';
+      document.getElementById('cfg-cpu').textContent = `${c.limits?.cpu_cores ?? '?'} cores`;
+      document.getElementById('cfg-ram').textContent = `${c.limits?.ram_mb ?? '?'} MB`;
+      document.getElementById('cfg-disk').textContent = `${c.limits?.disk_gb ?? '?'} GB`;
+      document.getElementById('cfg-profiles').textContent = (c.profiles || []).join(', ') || '—';
+      document.getElementById('cfg-autostart').textContent = c.autostart ? 'Yes' : 'No';
+      document.getElementById('cfg-created').textContent = new Date(c.created_at).toLocaleString();
+      if (c.ipv4) document.getElementById('stat-ip').textContent = c.ipv4;
+
+      await renderActionButtons(c);
+
+      const termUI = document.getElementById('terminal-ui');
+      const termDisabled = document.getElementById('terminal-disabled');
+      if (c.status === 'Running') {
+        termUI.style.display = 'block';
+        termDisabled.style.display = 'none';
+      } else {
+        termUI.style.display = 'none';
+        termDisabled.style.display = 'block';
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  async function renderActionButtons(container) {
+    try {
+      const userRes = await fetch('/api/users/me');
+      if (!userRes.ok) return;
+      const user = await userRes.json();
+      if (user.role !== 'admin') return;
+
+      const btns = document.getElementById('action-buttons');
+      const isRunning = container.status === 'Running';
+      const isStopped = container.status === 'Stopped';
+
+      btns.innerHTML = `
+        ${isStopped ? `<button class="btn btn-primary" onclick="doAction('start')">▶ Start</button>` : ''}
+        ${isRunning ? `
+          <button class="btn btn-secondary" onclick="doAction('restart')">↺ Restart</button>
+          <button class="btn btn-danger" onclick="doAction('stop')">■ Stop</button>
+        ` : ''}
+      `;
+    } catch (e) {}
+  }
+
+  async function doAction(action) {
+    if (!confirm(`${action} container "${containerName}"?`)) return;
+    const res = await fetch(`/api/containers/${containerName}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) { const err = await res.json(); alert(`Failed: ${err.description}`); return; }
+    await loadContainer();
+    await pollMetrics();
+  }
+
+  window.doAction = doAction;
+
+  async function pollMetrics() {
+    try {
+      const res = await fetch('/api/metrics/live');
+      if (!res.ok) return;
+      const data = await res.json();
+      const m = (data.metrics || []).find(x => x.container === containerName);
+      if (!m) return;
+
+      document.getElementById('stat-cpu').textContent = `${(m.cpu_usage_pct || 0).toFixed(1)}%`;
+      document.getElementById('stat-ram').textContent = `${m.ram_used_mb || 0} / ${m.ram_limit_mb || '?'} MB`;
+      document.getElementById('stat-net-rx').textContent = formatBytes((m.net_rx_rate_bps || 0) * 8) + '/s';
+      document.getElementById('stat-net-tx').textContent = formatBytes((m.net_tx_rate_bps || 0) * 8) + '/s';
+      document.getElementById('stat-procs').textContent = m.process_count || 0;
+      if (m.ipv4) document.getElementById('stat-ip').textContent = m.ipv4;
+    } catch (e) {}
+  }
+
+  async function loadChart(range = '1h') {
+    const container = document.getElementById('chart-container');
+    const empty = document.getElementById('chart-empty');
+    try {
+      const res = await fetch(`/api/metrics/${containerName}/history?range=${range}&points=200`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const points = (data.data || []).filter(p => !p.gap);
+      if (points.length < 2) {
+        if (container) container.style.display = 'none';
+        if (empty) empty.style.display = 'block';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      if (container) container.style.display = 'block';
+
+      const timestamps = points.map(p => new Date(p.time).getTime() / 1000);
+      const cpuValues  = points.map(p => p.cpu_usage_pct ?? 0);
+      const ramValues  = points.map(p => p.ram_used_mb ?? 0);
+
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      if (typeof uPlot === 'undefined') return;
+
+      chartInstance = new uPlot({
+        width: container.offsetWidth,
+        height: 200,
+        series: [
+          {},
+          { label: 'CPU %', stroke: '#388bfd', width: 2, fill: 'rgba(56,139,253,0.08)' },
+          { label: 'RAM MB', stroke: '#3fb950', width: 2, fill: 'rgba(63,185,80,0.08)', scale: 'ram' },
+        ],
+        scales: { x: {}, y: { range: [0, 100] }, ram: {} },
+        axes: [
+          { stroke: '#484f58', ticks: { stroke: '#21262d' }, grid: { stroke: '#21262d' } },
+          { stroke: '#484f58', ticks: { stroke: '#21262d' }, grid: { stroke: '#21262d' }, label: 'CPU %' },
+          { scale: 'ram', side: 1, stroke: '#3fb950', ticks: { stroke: '#21262d' }, grid: { show: false }, label: 'RAM MB' },
+        ],
+      }, [timestamps, cpuValues, ramValues], container);
+    } catch (e) { console.error(e); }
+  }
+
+  document.querySelectorAll('.range-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadChart(btn.dataset.range);
+    });
+  });
+
+  const termForm = document.getElementById('terminal-form');
+  const termInput = document.getElementById('terminal-input');
+  const termOutput = document.getElementById('terminal-output');
+
+  function appendLine(text, cls) {
+    const line = document.createElement('span');
+    line.className = `terminal-line ${cls}`;
+    line.textContent = text;
+    termOutput.appendChild(line);
+    termOutput.scrollTop = termOutput.scrollHeight;
+  }
+
+  termForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cmd = termInput.value.trim();
+    if (!cmd) return;
+    commandHistory.unshift(cmd);
+    if (commandHistory.length > 50) commandHistory.pop();
+    historyIndex = -1;
+    termInput.value = '';
+    termInput.disabled = true;
+    document.getElementById('terminal-submit').disabled = true;
+    appendLine(`$ ${cmd}`, 'terminal-command');
+    try {
+      const res = await fetch(`/api/containers/${containerName}/exec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        appendLine(`Error: ${data.description || data.error}`, 'terminal-stderr');
+      } else {
+        if (data.stdout) appendLine(data.stdout, 'terminal-stdout');
+        if (data.stderr) appendLine(data.stderr, 'terminal-stderr');
+        appendLine(`[exit ${data.exit_code}]`, 'terminal-exit');
+      }
+    } catch (err) {
+      appendLine(`Network error: ${err.message}`, 'terminal-stderr');
+    } finally {
+      termInput.disabled = false;
+      document.getElementById('terminal-submit').disabled = false;
+      termInput.focus();
+    }
+  });
+
+  termInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); if (historyIndex < commandHistory.length - 1) { historyIndex++; termInput.value = commandHistory[historyIndex]; } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (historyIndex > 0) { historyIndex--; termInput.value = commandHistory[historyIndex]; } else { historyIndex = -1; termInput.value = ''; } }
+  });
+
+  (async () => {
+    await loadContainer();
+    await pollMetrics();
+    await loadChart('1h');
+    pollTimer = setInterval(pollMetrics, 15000);
+  })();
+
+  window.addEventListener('beforeunload', () => { if (pollTimer) clearInterval(pollTimer); });
+  window.addEventListener('resize', () => { if (chartInstance) loadChart(); });
+</script>

@@ -1,0 +1,15 @@
+---
+/**
+ * 403 Access Denied page.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="403 — Access Denied">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;text-align:center;gap:16px;">
+    <div style="font-size:64px;font-weight:800;background:linear-gradient(135deg, var(--accent-red), var(--accent-orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">403</div>
+    <h1 style="font-size:22px;font-weight:700;">Access Denied</h1>
+    <p style="color:var(--text-secondary);font-size:14px;max-width:400px;">You don't have permission to access this resource. Contact an administrator if you believe this is an error.</p>
+    <a href="/dashboard" class="btn btn-primary" style="margin-top:8px;">Go to Dashboard</a>
+  </div>
+</BaseLayout>

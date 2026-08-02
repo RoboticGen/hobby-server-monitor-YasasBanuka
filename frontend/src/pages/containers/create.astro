@@ -1,0 +1,418 @@
+---
+/**
+ * Container creation page. Admin only.
+ *
+ * Fetches host capacity and available images/profiles from the API.
+ * Dynamic sliders bounded by actual host resources and user quota.
+ */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Create Container">
+  <div class="page-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <a href="/dashboard" class="back-link">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+            <path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06z"/>
+          </svg>
+          Dashboard
+        </a>
+        <span style="color:var(--border-strong)">/</span>
+        <h1 class="page-title" style="font-size:18px;">New Container</h1>
+      </div>
+      <p class="page-subtitle">Create a new LXD container</p>
+    </div>
+  </div>
+
+  <div id="access-denied" class="alert alert-error" style="display:none;">
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+      <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/>
+    </svg>
+    Container creation requires admin privileges.
+  </div>
+
+  <div id="create-form" style="display:none;">
+    <div class="form-layout">
+      <!-- Main form -->
+      <div class="form-main">
+        <div class="card">
+          <h2 class="card-section-title" style="margin-bottom:20px;">Container Details</h2>
+
+          <div id="form-error" class="alert alert-error" style="display:none;margin-bottom:16px;"></div>
+
+          <form id="create-container-form">
+            <div class="form-group">
+              <label class="form-label" for="name">Container Name *</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                class="form-input"
+                placeholder="my-container"
+                pattern="^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]$|^[a-zA-Z0-9]$"
+                required
+                maxlength="63"
+              />
+              <p class="form-hint">Lowercase letters, digits, and hyphens. Must start with a letter or digit.</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="description">Description</label>
+              <input
+                type="text"
+                id="description"
+                name="description"
+                class="form-input"
+                placeholder="What is this container for?"
+                maxlength="500"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="image">Image *</label>
+              <select id="image" name="image" class="form-select" required>
+                <option value="">Loading images...</option>
+              </select>
+              <p class="form-hint">LXD image alias to use as base.</p>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="form-group">
+                <label class="form-label" for="profile">Profile</label>
+                <select id="profile" name="profile" class="form-select">
+                  <option value="default">default</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="storage_pool">Storage Pool</label>
+                <select id="storage_pool" name="storage_pool" class="form-select">
+                  <option value="default">default</option>
+                </select>
+              </div>
+            </div>
+
+            <h3 class="section-divider">Resource Limits</h3>
+
+            <div class="form-group">
+              <label class="form-label">
+                CPU Cores — <span id="cpu-value">2</span>
+                <span class="quota-remaining" id="cpu-quota"></span>
+              </label>
+              <input type="range" id="cpu_cores" name="cpu_cores" min="1" max="8" value="2" step="1" />
+              <div class="slider-labels"><span>1 core</span><span id="cpu-max-label">8 cores</span></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">
+                RAM — <span id="ram-value">1024</span> MB
+                <span class="quota-remaining" id="ram-quota"></span>
+              </label>
+              <input type="range" id="ram_mb" name="ram_mb" min="64" max="8192" value="1024" step="64" />
+              <div class="slider-labels"><span>64 MB</span><span id="ram-max-label">8 GB</span></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">
+                Disk — <span id="disk-value">10</span> GB
+                <span class="quota-remaining" id="disk-quota"></span>
+              </label>
+              <input type="range" id="disk_gb" name="disk_gb" min="1" max="100" value="10" step="1" />
+              <div class="slider-labels"><span>1 GB</span><span id="disk-max-label">100 GB</span></div>
+            </div>
+
+            <h3 class="section-divider">Options</h3>
+
+            <div style="display:flex;gap:24px;margin-bottom:16px;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="autostart" name="autostart" />
+                <span>Auto-start on host boot</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="ephemeral" name="ephemeral" />
+                <span>Ephemeral (deleted on stop)</span>
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary" id="submit-btn">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+                  <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+                </svg>
+                Create Container
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Summary sidebar -->
+      <div class="form-sidebar">
+        <div class="card">
+          <h2 class="card-section-title" style="margin-bottom:14px;">Resource Summary</h2>
+          <div class="resource-summary" id="resource-summary">
+            <div class="resource-row">
+              <span>CPU</span>
+              <strong id="sum-cpu">2 cores</strong>
+            </div>
+            <div class="resource-row">
+              <span>RAM</span>
+              <strong id="sum-ram">1024 MB</strong>
+            </div>
+            <div class="resource-row">
+              <span>Disk</span>
+              <strong id="sum-disk">10 GB</strong>
+            </div>
+          </div>
+
+          <h3 class="card-section-title" style="margin:16px 0 10px;">Host Capacity</h3>
+          <div id="host-capacity" class="host-capacity">
+            <p style="color:var(--text-muted);font-size:12px;">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .back-link {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 13px; color: var(--text-secondary);
+    text-decoration: none; transition: color var(--transition-fast);
+  }
+  .back-link:hover { color: var(--text-primary); }
+
+  .card-section-title {
+    font-size: 14px; font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  .form-layout {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) { .form-layout { grid-template-columns: 1fr; } }
+
+  .section-divider {
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 16px 0 12px;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 8px;
+  }
+
+  .quota-remaining {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 8px;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    accent-color: var(--accent-blue);
+    width: 14px; height: 14px;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .resource-summary { display: flex; flex-direction: column; gap: 8px; }
+  .resource-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .resource-row strong { color: var(--text-primary); font-weight: 600; }
+
+  .host-capacity { display: flex; flex-direction: column; gap: 10px; }
+  .host-cap-item { display: flex; flex-direction: column; gap: 4px; }
+  .host-cap-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+
+<script>
+  let hostCapacity = { ram_mb: 8192, cpu_cores: 8, disk_gb: 100 };
+  let currentUser = null;
+
+  // Load user and check admin
+  async function init() {
+    const res = await fetch('/api/users/me');
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    currentUser = await res.json();
+
+    if (currentUser.role !== 'admin') {
+      document.getElementById('access-denied').style.display = 'flex';
+      return;
+    }
+
+    document.getElementById('create-form').style.display = 'block';
+
+    // Load host capacity
+    await loadCapacity();
+    // Load images, profiles, storage pools
+    await loadNetworks();
+  }
+
+  async function loadCapacity() {
+    try {
+      const res = await fetch('/api/host/capacity');
+      if (res.ok) {
+        hostCapacity = await res.json();
+        updateSliderMaxes();
+        renderHostCapacity();
+      }
+    } catch (e) {}
+  }
+
+  function updateSliderMaxes() {
+    const quota = currentUser?.quota || {};
+    const maxRam  = Math.min(hostCapacity.ram_mb,  quota.ram_mb  || hostCapacity.ram_mb);
+    const maxCpu  = Math.min(hostCapacity.cpu_cores, quota.cpu_cores || hostCapacity.cpu_cores);
+    const maxDisk = Math.min(hostCapacity.disk_gb, quota.disk_gb || hostCapacity.disk_gb);
+
+    const ramSlider  = document.getElementById('ram_mb');
+    const cpuSlider  = document.getElementById('cpu_cores');
+    const diskSlider = document.getElementById('disk_gb');
+
+    if (ramSlider)  { ramSlider.max  = maxRam;  document.getElementById('ram-max-label').textContent  = `${(maxRam/1024).toFixed(1)} GB`; }
+    if (cpuSlider)  { cpuSlider.max  = maxCpu;  document.getElementById('cpu-max-label').textContent  = `${maxCpu} cores`; }
+    if (diskSlider) { diskSlider.max = maxDisk; document.getElementById('disk-max-label').textContent = `${maxDisk} GB`; }
+
+    if (quota.ram_mb)   document.getElementById('ram-quota').textContent  = `(quota: ${quota.ram_mb} MB)`;
+    if (quota.cpu_cores) document.getElementById('cpu-quota').textContent = `(quota: ${quota.cpu_cores} cores)`;
+    if (quota.disk_gb)  document.getElementById('disk-quota').textContent = `(quota: ${quota.disk_gb} GB)`;
+  }
+
+  function renderHostCapacity() {
+    const el = document.getElementById('host-capacity');
+    el.innerHTML = `
+      <div class="host-cap-item">
+        <span class="host-cap-label">RAM Total</span>
+        <div class="stat-bar"><div class="stat-bar-fill bar-blue" style="width:40%;"></div></div>
+        <small style="font-size:11px;color:var(--text-muted)">${hostCapacity.ram_mb} MB available</small>
+      </div>
+      <div class="host-cap-item">
+        <span class="host-cap-label">CPU Cores</span>
+        <small style="font-size:11px;color:var(--text-muted)">${hostCapacity.cpu_cores} logical cores</small>
+      </div>
+      <div class="host-cap-item">
+        <span class="host-cap-label">Disk</span>
+        <small style="font-size:11px;color:var(--text-muted)">${hostCapacity.disk_gb} GB total</small>
+      </div>
+    `;
+  }
+
+  async function loadNetworks() {
+    try {
+      const [imagesRes, networksRes] = await Promise.all([
+        fetch('/api/host/images'),
+        fetch('/api/host/networks'),
+      ]);
+
+      if (imagesRes.ok) {
+        const data = await imagesRes.json();
+        const sel = document.getElementById('image');
+        sel.innerHTML = data.images.map(img =>
+          `<option value="${img.aliases[0]}">${img.description} (${img.aliases.join(', ')})</option>`
+        ).join('');
+      }
+
+      if (networksRes.ok) {
+        const data = await networksRes.json();
+        const profSel = document.getElementById('profile');
+        profSel.innerHTML = data.profiles.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+        const poolSel = document.getElementById('storage_pool');
+        poolSel.innerHTML = data.storage_pools.map(p => `<option value="${p.name}">${p.name} (${p.driver})</option>`).join('');
+      }
+    } catch (e) {}
+  }
+
+  // Live slider value display
+  ['cpu_cores', 'ram_mb', 'disk_gb'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      if (id === 'cpu_cores') {
+        document.getElementById('cpu-value').textContent = el.value;
+        document.getElementById('sum-cpu').textContent = `${el.value} cores`;
+      }
+      if (id === 'ram_mb') {
+        document.getElementById('ram-value').textContent = el.value;
+        document.getElementById('sum-ram').textContent = `${el.value} MB`;
+      }
+      if (id === 'disk_gb') {
+        document.getElementById('disk-value').textContent = el.value;
+        document.getElementById('sum-disk').textContent = `${el.value} GB`;
+      }
+    });
+  });
+
+  // Form submission
+  document.getElementById('create-container-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('form-error');
+    const submitBtn = document.getElementById('submit-btn');
+
+    errEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+
+    const payload = {
+      name: document.getElementById('name').value.trim(),
+      description: document.getElementById('description').value.trim(),
+      image: document.getElementById('image').value,
+      profile: document.getElementById('profile').value,
+      storage_pool: document.getElementById('storage_pool').value,
+      ram_mb: parseInt(document.getElementById('ram_mb').value),
+      cpu_cores: parseInt(document.getElementById('cpu_cores').value),
+      disk_gb: parseInt(document.getElementById('disk_gb').value),
+      autostart: document.getElementById('autostart').checked,
+      ephemeral: document.getElementById('ephemeral').checked,
+    };
+
+    try {
+      const res = await fetch('/api/containers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.description || data.error || 'Creation failed.';
+        errEl.style.display = 'flex';
+        return;
+      }
+      // Success — redirect to container detail
+      window.location.href = `/containers/detail?name=${payload.name}`;
+    } catch (err) {
+      errEl.textContent = `Network error: ${err.message}`;
+      errEl.style.display = 'flex';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+        <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+      </svg> Create Container`;
+    }
+  });
+
+  init();
+</script>

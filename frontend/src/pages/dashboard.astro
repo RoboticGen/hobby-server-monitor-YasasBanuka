@@ -1,0 +1,600 @@
+---
+/**
+ * Main dashboard page.
+ * 
+ * Shows all containers the user has access to with:
+ * - Live status (Running/Stopped/Frozen/Error)
+ * - CPU, RAM, Network usage bars
+ * - Quick action buttons (start/stop)
+ * - Automatic refresh every 15 seconds
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Dashboard">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle" id="last-updated">Loading containers...</p>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <div class="lxd-status" id="lxd-status">
+        <span class="status-dot"></span>
+        <span class="status-text">LXD</span>
+      </div>
+      <a href="/containers/create" class="btn btn-primary" id="create-btn" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        New Container
+      </a>
+    </div>
+  </div>
+
+  <!-- LXD unavailable banner -->
+  <div class="alert alert-warning" id="lxd-warning" style="display:none;">
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+      <path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/>
+    </svg>
+    LXD is unreachable — showing last known state.
+  </div>
+
+  <!-- Container grid -->
+  <div id="container-grid" class="container-grid">
+    <!-- Skeletons shown while loading -->
+    <div class="container-card skeleton-card">
+      <div class="skeleton" style="height:18px; width:120px; margin-bottom:8px;"></div>
+      <div class="skeleton" style="height:12px; width:80px; margin-bottom:16px;"></div>
+      <div class="skeleton" style="height:60px;"></div>
+    </div>
+    <div class="container-card skeleton-card">
+      <div class="skeleton" style="height:18px; width:140px; margin-bottom:8px;"></div>
+      <div class="skeleton" style="height:12px; width:60px; margin-bottom:16px;"></div>
+      <div class="skeleton" style="height:60px;"></div>
+    </div>
+    <div class="container-card skeleton-card">
+      <div class="skeleton" style="height:18px; width:100px; margin-bottom:8px;"></div>
+      <div class="skeleton" style="height:12px; width:90px; margin-bottom:16px;"></div>
+      <div class="skeleton" style="height:60px;"></div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="empty-state" style="display:none;" class="empty-state">
+    <div class="empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+    </div>
+    <h3>No containers yet</h3>
+    <p>Create your first container to get started.</p>
+    <a href="/containers/create" class="btn btn-primary" id="empty-create-btn" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      Create Container
+    </a>
+  </div>
+
+  <!-- Confirm action modal -->
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal">
+      <h2 class="modal-title" id="modal-title">Confirm Action</h2>
+      <p id="modal-body" style="color: var(--text-secondary); font-size: 14px;"></p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  /* ── LXD status indicator ────────────────────────────────────────────── */
+  .lxd-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--status-stopped);
+    transition: background var(--transition-normal);
+  }
+
+  .lxd-status.connected .status-dot   { background: var(--status-running); box-shadow: 0 0 6px var(--status-running); }
+  .lxd-status.error .status-dot       { background: var(--status-error); }
+
+  /* ── Container grid ──────────────────────────────────────────────────── */
+  .container-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .container-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .container-card:hover {
+    border-color: var(--border-default);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .container-card:hover .card-name { color: var(--accent-blue-light); }
+
+  .skeleton-card { cursor: default; }
+  .skeleton-card:hover { border-color: var(--border-subtle); box-shadow: none; }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .card-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: color var(--transition-fast);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .card-image {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .card-ip {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .icon-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    padding: 5px 7px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex; align-items: center;
+    transition: all var(--transition-fast);
+  }
+
+  .icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .icon-btn.danger:hover { border-color: var(--accent-red); color: var(--accent-red); background: rgba(248,81,73,0.1); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  /* ── Resource stats ──────────────────────────────────────────────────── */
+  .card-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .stat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  .stat-value {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Stopped container overlay ───────────────────────────────────────── */
+  .stopped-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* ── Limits row ─────────────────────────────────────────────────────── */
+  .limits-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .limit-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .limit-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .limit-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Empty state ─────────────────────────────────────────────────────── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .empty-icon {
+    width: 56px; height: 56px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+  }
+
+  .empty-icon svg { width: 28px; height: 28px; }
+
+  .empty-state h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .empty-state p {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+</style>
+
+<script>
+  /**
+   * Dashboard live update script.
+   *
+   * Polls /api/metrics/live every 15 seconds and re-renders container cards.
+   * Also fetches container list once on load for full config data.
+   */
+
+  let currentUser = null;
+  let containers = {};  // name → container data
+  let lxdAvailable = true;
+  let pollTimer = null;
+
+  // Color for usage bars based on percentage
+  function barColor(pct) {
+    if (pct >= 90) return 'bar-red';
+    if (pct >= 70) return 'bar-yellow';
+    return 'bar-blue';
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes/1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes/1024/1024).toFixed(1)} MB`;
+    return `${(bytes/1024/1024/1024).toFixed(2)} GB`;
+  }
+
+  function statusBadge(status) {
+    const map = {
+      'Running': 'badge-running',
+      'Stopped': 'badge-stopped',
+      'Frozen':  'badge-frozen',
+      'Error':   'badge-error',
+    };
+    return `<span class="badge ${map[status] || 'badge-stopped'}">${status}</span>`;
+  }
+
+  function renderCard(container, metrics) {
+    const name = container.name;
+    const status = container.status;
+    const isRunning = status === 'Running';
+    const limits = container.limits || {};
+
+    const cpu = metrics?.cpu_usage_pct ?? 0;
+    const ramUsed = metrics?.ram_used_mb ?? 0;
+    const ramLimit = limits.ram_mb || 1;
+    const ramPct = Math.min(100, (ramUsed / ramLimit) * 100);
+    const netRx = metrics?.net_rx_rate_bps ?? 0;
+    const netTx = metrics?.net_tx_rate_bps ?? 0;
+
+    const statsHtml = isRunning ? `
+      <div class="card-stats">
+        <div class="stat-row">
+          <div class="stat-label-row">
+            <span class="stat-label">CPU</span>
+            <span class="stat-value">${cpu.toFixed(1)}%</span>
+          </div>
+          <div class="stat-bar"><div class="stat-bar-fill ${barColor(cpu)}" style="width:${cpu}%;"></div></div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-label-row">
+            <span class="stat-label">RAM</span>
+            <span class="stat-value">${ramUsed} / ${limits.ram_mb ?? '?'} MB</span>
+          </div>
+          <div class="stat-bar"><div class="stat-bar-fill ${barColor(ramPct)}" style="width:${ramPct}%;"></div></div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-label-row">
+            <span class="stat-label">Network</span>
+            <span class="stat-value">↓${formatBytes(netRx*8)}/s ↑${formatBytes(netTx*8)}/s</span>
+          </div>
+        </div>
+      </div>
+    ` : `
+      <div class="stopped-overlay">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M4 4h8v8H4z"/>
+        </svg>
+        Container is ${status.toLowerCase()}
+      </div>
+    `;
+
+    const imageStr = container.image || '';
+    const ipStr = container.ipv4 ? `<span class="card-ip">${container.ipv4}</span>` : '';
+
+    // Only show start/stop if admin
+    const actionBtns = currentUser?.role === 'admin' ? `
+      <div class="card-actions" id="actions-${name}">
+        ${isRunning ? `
+          <button class="icon-btn" onclick="event.preventDefault(); triggerAction('${name}', 'stop')" title="Stop container">
+            <svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
+          </button>
+          <button class="icon-btn" onclick="event.preventDefault(); triggerAction('${name}', 'restart')" title="Restart container">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+        ` : `
+          <button class="icon-btn" onclick="event.preventDefault(); triggerAction('${name}', 'start')" title="Start container">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
+          </button>
+        `}
+      </div>
+    ` : '';
+
+    return `
+      <a href="/containers/detail?name=${name}" class="container-card">
+        <div class="card-header">
+          <div>
+            <div class="card-name">${name}</div>
+            <div class="card-meta">
+              ${statusBadge(status)}
+              <span class="card-image">${imageStr}</span>
+              ${ipStr}
+            </div>
+          </div>
+          ${actionBtns}
+        </div>
+        ${statsHtml}
+        <div class="limits-row">
+          <div class="limit-item">
+            <span class="limit-label">CPU</span>
+            <span class="limit-value">${limits.cpu_cores ?? '?'} cores</span>
+          </div>
+          <div class="limit-item">
+            <span class="limit-label">RAM</span>
+            <span class="limit-value">${limits.ram_mb ?? '?'} MB</span>
+          </div>
+          <div class="limit-item">
+            <span class="limit-label">Disk</span>
+            <span class="limit-value">${limits.disk_gb ?? '?'} GB</span>
+          </div>
+          ${container.ipv4 ? `<div class="limit-item"><span class="limit-label">IP</span><span class="limit-value" style="font-size:10px;">${container.ipv4}</span></div>` : ''}
+        </div>
+      </a>
+    `;
+  }
+
+  async function loadContainers() {
+    try {
+      const res = await fetch('/api/containers');
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) return;
+      const data = await res.json();
+      // Build a map by name
+      data.containers.forEach(c => { containers[c.name] = c; });
+    } catch (e) {
+      console.error('Failed to load containers:', e);
+    }
+  }
+
+  async function loadCurrentUser() {
+    try {
+      const res = await fetch('/api/users/me');
+      if (!res.ok) return;
+      currentUser = await res.json();
+      // Show admin-only buttons
+      if (currentUser.role === 'admin') {
+        document.getElementById('create-btn')?.style.setProperty('display', 'flex');
+        document.getElementById('empty-create-btn')?.style.setProperty('display', 'flex');
+      }
+    } catch (e) {}
+  }
+
+  async function pollMetrics() {
+    try {
+      const res = await fetch('/api/metrics/live');
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) return;
+
+      const data = await res.json();
+      lxdAvailable = data.lxd_available !== false;
+
+      // Update LXD status indicator
+      const statusEl = document.getElementById('lxd-status');
+      if (statusEl) {
+        statusEl.className = 'lxd-status ' + (lxdAvailable ? 'connected' : 'error');
+        statusEl.querySelector('.status-text').textContent = lxdAvailable ? 'LXD' : 'LXD Offline';
+      }
+
+      document.getElementById('lxd-warning')?.style.setProperty('display', lxdAvailable ? 'none' : 'flex');
+
+      // Merge live metrics with container config
+      const metricsMap = {};
+      (data.metrics || []).forEach(m => { metricsMap[m.container] = m; });
+
+      // Also merge container data (from metrics for names)
+      (data.metrics || []).forEach(m => {
+        if (!containers[m.container]) {
+          containers[m.container] = { name: m.container, status: m.status, limits: {} };
+        }
+        containers[m.container].status = m.status || containers[m.container].status;
+      });
+
+      // Render cards
+      const grid = document.getElementById('container-grid');
+      const emptyState = document.getElementById('empty-state');
+      const names = Object.keys(containers);
+
+      if (names.length === 0) {
+        if (grid) grid.innerHTML = '';
+        if (emptyState) emptyState.style.display = 'flex';
+      } else {
+        if (emptyState) emptyState.style.display = 'none';
+        if (grid) {
+          grid.innerHTML = names
+            .sort()
+            .map(name => renderCard(containers[name], metricsMap[name]))
+            .join('');
+        }
+      }
+
+      const now = new Date();
+      const updated = document.getElementById('last-updated');
+      if (updated) {
+        updated.textContent = `${names.length} container${names.length !== 1 ? 's' : ''} · updated ${now.toLocaleTimeString()}`;
+      }
+
+    } catch (e) {
+      console.error('Poll failed:', e);
+    }
+  }
+
+  async function triggerAction(name, action) {
+    const modal = document.getElementById('confirm-modal');
+    const title = document.getElementById('modal-title');
+    const body  = document.getElementById('modal-body');
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn  = document.getElementById('modal-cancel');
+
+    const messages = {
+      stop:    { title: `Stop ${name}?`, body: 'The container will be stopped gracefully.', btnClass: 'btn-danger' },
+      start:   { title: `Start ${name}?`, body: 'The container will be started.', btnClass: 'btn-primary' },
+      restart: { title: `Restart ${name}?`, body: 'The container will be restarted.', btnClass: 'btn-danger' },
+    };
+    const msg = messages[action] || { title: `${action} ${name}?`, body: '', btnClass: 'btn-primary' };
+
+    title.textContent = msg.title;
+    body.textContent = msg.body;
+    confirmBtn.className = `btn ${msg.btnClass}`;
+    modal.classList.add('open');
+
+    return new Promise(resolve => {
+      const doConfirm = async () => {
+        modal.classList.remove('open');
+        try {
+          const res = await fetch(`/api/containers/${name}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            alert(`Failed: ${err.description || err.error}`);
+          }
+        } catch (e) { alert(`Error: ${e.message}`); }
+        await pollMetrics();
+        cleanup();
+        resolve();
+      };
+      const doCancel = () => { modal.classList.remove('open'); cleanup(); resolve(); };
+      const cleanup = () => {
+        confirmBtn.removeEventListener('click', doConfirm);
+        cancelBtn.removeEventListener('click', doCancel);
+      };
+      confirmBtn.addEventListener('click', doConfirm);
+      cancelBtn.addEventListener('click', doCancel);
+    });
+  }
+
+  // Expose for inline onclick
+  window.triggerAction = triggerAction;
+
+  // Initialize
+  (async () => {
+    await loadCurrentUser();
+    await loadContainers();
+    await pollMetrics();
+    // Poll every 15 seconds
+    pollTimer = setInterval(pollMetrics, 15000);
+  })();
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => { if (pollTimer) clearInterval(pollTimer); });
+</script>
