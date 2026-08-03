@@ -1,0 +1,338 @@
+---
+/**
+ * User management page. Admin only.
+ * List all users, invite new users, manage quotas and container assignments.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Users">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Users</h1>
+      <p class="page-subtitle">Manage access and resource quotas</p>
+    </div>
+    <button class="btn btn-primary" id="invite-btn">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+        <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+      </svg>
+      Invite User
+    </button>
+  </div>
+
+  <div id="access-denied" class="alert alert-error" style="display:none;">
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+      <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/>
+    </svg>
+    User management requires admin privileges.
+  </div>
+
+  <div id="users-content" style="display:none;">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Quota (RAM / CPU / Disk)</th>
+            <th>Containers</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-table-body">
+          <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Invite user modal -->
+  <div class="modal-overlay" id="invite-modal">
+    <div class="modal">
+      <h2 class="modal-title">Invite User</h2>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+        The user will be able to sign in with this Google account after acceptance.
+      </p>
+      <div id="invite-error" class="alert alert-error" style="display:none;margin-bottom:12px;"></div>
+      <form id="invite-form">
+        <div class="form-group">
+          <label class="form-label" for="invite-email">Google Email *</label>
+          <input type="email" id="invite-email" class="form-input" placeholder="user@gmail.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="invite-role">Role</label>
+          <select id="invite-role" class="form-select">
+            <option value="user">User (can access assigned containers)</option>
+            <option value="admin">Admin (full access)</option>
+          </select>
+        </div>
+        <details style="margin-bottom:16px;">
+          <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;margin-bottom:8px;">
+            Custom Quota (optional)
+          </summary>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px;">
+            <div class="form-group">
+              <label class="form-label" for="q-ram">RAM (MB)</label>
+              <input type="number" id="q-ram" class="form-input" value="2048" min="64" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="q-cpu">CPU Cores</label>
+              <input type="number" id="q-cpu" class="form-input" value="4" min="1" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="q-disk">Disk (GB)</label>
+              <input type="number" id="q-disk" class="form-input" value="50" min="1" />
+            </div>
+          </div>
+        </details>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="invite-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="invite-submit">Send Invite</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Assign container modal -->
+  <div class="modal-overlay" id="assign-modal">
+    <div class="modal">
+      <h2 class="modal-title">Assign Container</h2>
+      <div class="form-group">
+        <label class="form-label" for="assign-container">Container</label>
+        <select id="assign-container" class="form-select">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="assign-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="assign-confirm">Assign</button>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .user-cell { display: flex; align-items: center; gap: 10px; }
+  .user-avatar-sm {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: white;
+    flex-shrink: 0;
+    background-size: cover; background-position: center;
+  }
+  .user-email { font-size: 13px; font-weight: 500; }
+  .user-name-sm { font-size: 11px; color: var(--text-muted); }
+  .container-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--bg-tertiary); border: 1px solid var(--border-default);
+    border-radius: 100px; padding: 2px 8px;
+    font-size: 11px; color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .chip-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 0; font-size: 13px; line-height: 1;
+    transition: color var(--transition-fast);
+  }
+  .chip-remove:hover { color: var(--accent-red); }
+  .add-container-btn {
+    background: none; border: 1px dashed var(--border-default);
+    border-radius: 100px; padding: 2px 8px;
+    font-size: 11px; color: var(--text-muted);
+    cursor: pointer; transition: all var(--transition-fast);
+  }
+  .add-container-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue-light); }
+</style>
+
+<script>
+  let currentUserId = null;
+  let containers = [];
+  let selectedUserId = null;
+
+  async function init() {
+    const res = await fetch('/api/users/me');
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const me = await res.json();
+    currentUserId = me.id;
+
+    if (me.role !== 'admin') {
+      document.getElementById('access-denied').style.display = 'flex';
+      return;
+    }
+    document.getElementById('users-content').style.display = 'block';
+    await loadContainers();
+    await loadUsers();
+  }
+
+  async function loadContainers() {
+    try {
+      const res = await fetch('/api/containers');
+      if (res.ok) {
+        const data = await res.json();
+        containers = data.containers || [];
+      }
+    } catch (e) {}
+  }
+
+  async function loadUsers() {
+    const tbody = document.getElementById('users-table-body');
+    try {
+      const res = await fetch('/api/users');
+      if (!res.ok) return;
+      const data = await res.json();
+      const users = data.users || [];
+
+      if (users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px;">No users yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = users.map(u => {
+        const chips = u.containers.map(c => `
+          <span class="chip">
+            ${c}
+            <button class="chip-remove" onclick="revokeContainer(${u.id}, '${c}')" title="Remove access">×</button>
+          </span>
+        `).join('');
+
+        const avatarStyle = u.picture_url
+          ? `style="background-image:url(${u.picture_url});background-size:cover;"`
+          : '';
+
+        return `
+          <tr>
+            <td>
+              <div class="user-cell">
+                <div class="user-avatar-sm" ${avatarStyle}>${!u.picture_url ? (u.name || u.email)[0].toUpperCase() : ''}</div>
+                <div>
+                  <div class="user-email">${u.email}</div>
+                  ${u.name ? `<div class="user-name-sm">${u.name}</div>` : ''}
+                </div>
+              </div>
+            </td>
+            <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${u.role}</span></td>
+            <td><span class="badge ${u.active ? 'badge-running' : 'badge-stopped'}">${u.active ? 'Active' : 'Inactive'}</span></td>
+            <td style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);">
+              ${u.quota.ram_mb} MB / ${u.quota.cpu_cores} cores / ${u.quota.disk_gb} GB
+            </td>
+            <td>
+              <div class="container-chips">
+                ${chips}
+                ${u.active ? `<button class="add-container-btn" onclick="openAssign(${u.id})">+ Add</button>` : ''}
+              </div>
+            </td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                ${u.active && u.id !== currentUserId
+                  ? `<button class="btn btn-sm btn-danger" onclick="revokeUser(${u.id}, '${u.email}')">Revoke</button>`
+                  : ''}
+                ${!u.active
+                  ? `<span style="color:var(--text-muted);font-size:12px;">Revoked</span>`
+                  : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--accent-red);padding:40px;">Failed to load users.</td></tr>`;
+    }
+  }
+
+  async function revokeUser(id, email) {
+    if (!confirm(`Revoke access for ${email}? They will be immediately signed out.`)) return;
+    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    if (!res.ok) { alert('Failed to revoke user.'); return; }
+    await loadUsers();
+  }
+
+  async function revokeContainer(userId, containerName) {
+    if (!confirm(`Remove access to "${containerName}" from this user?`)) return;
+    const res = await fetch(`/api/users/${userId}/assign/${containerName}`, { method: 'DELETE' });
+    if (!res.ok) { alert('Failed to revoke container access.'); return; }
+    await loadUsers();
+  }
+
+  function openAssign(userId) {
+    selectedUserId = userId;
+    const sel = document.getElementById('assign-container');
+    sel.innerHTML = containers.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    document.getElementById('assign-modal').classList.add('open');
+  }
+
+  document.getElementById('assign-confirm')?.addEventListener('click', async () => {
+    const container = document.getElementById('assign-container').value;
+    if (!container || !selectedUserId) return;
+    const res = await fetch(`/api/users/${selectedUserId}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ container_name: container }),
+    });
+    document.getElementById('assign-modal').classList.remove('open');
+    if (!res.ok) { alert('Failed to assign container.'); return; }
+    await loadUsers();
+  });
+
+  document.getElementById('assign-cancel')?.addEventListener('click', () => {
+    document.getElementById('assign-modal').classList.remove('open');
+  });
+
+  // Invite user
+  document.getElementById('invite-btn')?.addEventListener('click', () => {
+    document.getElementById('invite-modal').classList.add('open');
+  });
+
+  document.getElementById('invite-cancel')?.addEventListener('click', () => {
+    document.getElementById('invite-modal').classList.remove('open');
+  });
+
+  document.getElementById('invite-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('invite-error');
+    errEl.style.display = 'none';
+
+    const payload = {
+      email: document.getElementById('invite-email').value.trim(),
+      role: document.getElementById('invite-role').value,
+      quota: {
+        ram_mb: parseInt(document.getElementById('q-ram').value),
+        cpu_cores: parseInt(document.getElementById('q-cpu').value),
+        disk_gb: parseInt(document.getElementById('q-disk').value),
+      },
+    };
+
+    const submitBtn = document.getElementById('invite-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Inviting...';
+
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send Invite';
+
+    if (!res.ok) {
+      const data = await res.json();
+      errEl.textContent = data.description || data.error || 'Failed.';
+      errEl.style.display = 'flex';
+      return;
+    }
+
+    document.getElementById('invite-modal').classList.remove('open');
+    document.getElementById('invite-form').reset();
+    await loadUsers();
+  });
+
+  window.revokeUser = revokeUser;
+  window.revokeContainer = revokeContainer;
+  window.openAssign = openAssign;
+
+  init();
+</script>
