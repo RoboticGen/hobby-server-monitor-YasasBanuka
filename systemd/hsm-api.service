@@ -1,0 +1,38 @@
+[Unit]
+Description=Hobby Server Monitor — Falcon API
+Documentation=https://github.com/your-repo/rgen-hobby-server-monitor
+After=network.target lxd.service
+Wants=lxd.service
+
+[Service]
+Type=simple
+User=hsm
+Group=lxd
+
+# Environment file contains all secrets (not committed to git)
+EnvironmentFile=/etc/hsm/hsm.env
+
+WorkingDirectory=/opt/hsm/backend
+
+ExecStart=/opt/hsm/venv/bin/gunicorn hsm.wsgi:app \
+    --bind 0.0.0.0:8000 \
+    --workers 1 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile -
+
+# Restart policy: always restart if the process dies
+Restart=always
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=5
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/hsm/backend/data
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

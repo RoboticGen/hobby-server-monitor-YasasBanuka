@@ -1,0 +1,31 @@
+[Unit]
+Description=Hobby Server Monitor — Metric Collector
+Documentation=https://github.com/your-repo/rgen-hobby-server-monitor
+After=network.target lxd.service
+Wants=lxd.service
+
+[Service]
+Type=simple
+User=hsm
+Group=lxd
+
+EnvironmentFile=/etc/hsm/hsm.env
+
+WorkingDirectory=/opt/hsm/backend
+
+ExecStart=/opt/hsm/venv/bin/python -m hsm.collector.main
+
+Restart=always
+RestartSec=10
+StartLimitInterval=120
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/hsm/backend/data
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
