@@ -249,7 +249,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   async function blockUser(id, email) {
     if (!confirm(`Block access for ${email}? They will be immediately signed out.`)) return;
     const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    if (!res.ok) { alert('Failed to block user.'); return; }
+    if (!res.ok) { 
+      const err = await res.json().catch(() => ({}));
+      alert(`Error: ${err.description || err.title || 'Failed to block user.'}`);
+      return; 
+    }
     await loadUsers();
   }
 
@@ -260,7 +264,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ active: true })
     });
-    if (!res.ok) { alert('Failed to unblock user.'); return; }
+    if (!res.ok) { 
+      const err = await res.json().catch(() => ({}));
+      alert(`Error: ${err.description || err.title || 'Failed to unblock user.'}`);
+      return; 
+    }
     await loadUsers();
   }
 

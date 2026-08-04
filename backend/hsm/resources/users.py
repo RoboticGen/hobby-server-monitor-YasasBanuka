@@ -174,12 +174,17 @@ class UserResource:
             role = body["role"]
             if role not in ("admin", "user"):
                 raise falcon.HTTPBadRequest(title="Invalid role")
+            if int(user_id) == 1 and role != "admin":
+                raise falcon.HTTPForbidden(description="The primary owner (User 1) cannot be demoted.")
             updates.append("role = ?")
             params.append(role)
 
         if "active" in body:
+            active_val = 1 if body["active"] else 0
+            if int(user_id) == 1 and active_val == 0:
+                raise falcon.HTTPForbidden(description="The primary owner (User 1) cannot be blocked.")
             updates.append("active = ?")
-            params.append(1 if body["active"] else 0)
+            params.append(active_val)
 
         if "quota" in body:
             quota = body["quota"]
@@ -216,6 +221,12 @@ class UserResource:
         user = db.execute("SELECT * FROM users WHERE id = ?", (int(user_id),)).fetchone()
         if not user:
             raise falcon.HTTPNotFound()
+
+        if int(user_id) == 1:
+            raise falcon.HTTPForbidden(
+                title="Cannot block primary owner",
+                description="User ID 1 is the primary owner and cannot be blocked."
+            )
 
         if user["id"] == actor["id"]:
             raise falcon.HTTPBadRequest(
