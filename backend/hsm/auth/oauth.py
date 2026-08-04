@@ -100,10 +100,7 @@ class OAuthCallbackResource:
                 break
 
         if not stored_state or not secrets.compare_digest(state, stored_state):
-            raise falcon.HTTPBadRequest(
-                title="Invalid state",
-                description="OAuth state mismatch. Possible CSRF attempt.",
-            )
+            raise falcon.HTTPFound("/login?error=invalid_state")
 
         # ── 2. Exchange authorization code for access token ──────────────────
         user_info = self._exchange_and_fetch(code)
@@ -113,19 +110,10 @@ class OAuthCallbackResource:
 
         if not user:
             # User exists but wasn't invited (and is not the bootstrap admin)
-            raise falcon.HTTPForbidden(
-                title="Access denied",
-                description=(
-                    "Your account has not been invited. "
-                    "Contact an administrator to request access."
-                ),
-            )
+            raise falcon.HTTPFound("/login?error=not_invited")
 
         if not user["active"]:
-            raise falcon.HTTPForbidden(
-                title="Account inactive",
-                description="Your account has been deactivated.",
-            )
+            raise falcon.HTTPFound("/login?error=inactive")
 
         # ── 4. Issue JWT and set session cookie ───────────────────────────────
         token = issue_token(user["id"], user["role"])
@@ -199,23 +187,28 @@ class OAuthCallbackResource:
 
         db = get_db()
 
-        # Check if user already exists
+        # Check if user already exists in our DB
         existing = db.execute(
             "SELECT id, email, name, role, active FROM users WHERE email = ?",
             (email,),
         ).fetchone()
 
         if existing:
-            # Update name/picture in case they changed on Google's side
+            # If active=0 and name is empty, this is their first login after being invited!
+            is_pending = (existing["active"] == 0 and existing["name"] == "")
+            new_active = 1 if is_pending else existing["active"]
+            
             db.execute(
-                "UPDATE users SET name = ?, picture_url = ? WHERE email = ?",
-                (name, picture, email),
+                "UPDATE users SET name = ?, picture_url = ?, active = ? WHERE email = ?",
+                (name, picture, new_active, email),
             )
             db.commit()
-            return dict(existing)
+            
+            ret = dict(existing)
+            ret["active"] = new_active
+            return ret
 
-        # New user — check if they're allowed in
-        # First: check bootstrap admin condition
+        # New user — check if they're allowed in (bootstrap admin)
         admin_exists = db.execute(
             "SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"
         ).fetchone()
@@ -236,28 +229,6 @@ class OAuthCallbackResource:
                 "email": email,
                 "name": name,
                 "role": "admin",
-                "active": 1,
-            }
-
-        # Not bootstrap admin — check if explicitly invited
-        # (Invited users are pre-inserted with active=0 by the admin; we activate them here)
-        invited = db.execute(
-            "SELECT id, email, name, role, active FROM users WHERE email = ? AND active = 0",
-            (email,),
-        ).fetchone()
-
-        if invited:
-            # Activate the invited user and update their profile
-            db.execute(
-                "UPDATE users SET name = ?, picture_url = ?, active = 1 WHERE email = ?",
-                (name, picture, email),
-            )
-            db.commit()
-            return {
-                "id": invited["id"],
-                "email": email,
-                "name": name,
-                "role": invited["role"],
                 "active": 1,
             }
 
