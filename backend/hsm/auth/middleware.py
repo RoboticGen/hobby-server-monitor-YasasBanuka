@@ -85,7 +85,7 @@ class AuthMiddleware:
         ).fetchone()
 
         if not user or not user["active"]:
-            raise falcon.HTTPForbidden(
+            raise falcon.HTTPUnauthorized(
                 title="Account inactive",
                 description="Your account has been deactivated. Contact an administrator.",
             )

@@ -227,10 +227,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             <td>
               <div style="display:flex;gap:6px;">
                 ${u.active && u.id !== currentUserId
-                  ? `<button class="btn btn-sm btn-danger" onclick="revokeUser(${u.id}, '${u.email}')">Revoke</button>`
+                  ? `<button class="btn btn-sm btn-danger" onclick="blockUser(${u.id}, '${u.email}')">Block</button>`
                   : ''}
-                ${!u.active
-                  ? `<span style="color:var(--text-muted);font-size:12px;">Revoked</span>`
+                ${!u.active && u.name !== ''
+                  ? `<button class="btn btn-sm btn-success" onclick="unblockUser(${u.id}, '${u.email}')">Unblock</button>`
+                  : ''}
+                ${!u.active && u.name === ''
+                  ? `<span style="color:var(--text-muted);font-size:12px;">Pending</span>`
                   : ''}
               </div>
             </td>
@@ -243,10 +246,21 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
   }
 
-  async function revokeUser(id, email) {
-    if (!confirm(`Revoke access for ${email}? They will be immediately signed out.`)) return;
+  async function blockUser(id, email) {
+    if (!confirm(`Block access for ${email}? They will be immediately signed out.`)) return;
     const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    if (!res.ok) { alert('Failed to revoke user.'); return; }
+    if (!res.ok) { alert('Failed to block user.'); return; }
+    await loadUsers();
+  }
+
+  async function unblockUser(id, email) {
+    if (!confirm(`Unblock access for ${email}? They will be able to sign in again.`)) return;
+    const res = await fetch(`/api/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: true })
+    });
+    if (!res.ok) { alert('Failed to unblock user.'); return; }
     await loadUsers();
   }
 
@@ -330,7 +344,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     await loadUsers();
   });
 
-  window.revokeUser = revokeUser;
+  window.blockUser = blockUser;
+  window.unblockUser = unblockUser;
   window.revokeContainer = revokeContainer;
   window.openAssign = openAssign;
 
