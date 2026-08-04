@@ -295,11 +295,14 @@ class ContainerResource:
         meta = db.execute("SELECT * FROM containers WHERE name = ?", (name,)).fetchone()
         resp.media = _serialize_instance(instance, dict(meta) if meta else None)
 
-    @require_role("admin")
     def on_patch(self, req: falcon.Request, resp: falcon.Response, name: str) -> None:
-        """Update container config or trigger a lifecycle action. Admin only."""
+        """Update container config (admin) or trigger a lifecycle action (admin or assigned user)."""
         user = req.context.user
         name = validate_container_name(name)
+        
+        # Ensures user is either an admin, or specifically assigned to this container
+        check_container_access(req, name)
+        
         body = req.media or {}
 
         try:
@@ -309,6 +312,7 @@ class ContainerResource:
             raise falcon.HTTPNotFound(title="Container not found")
 
         # Lifecycle action (start/stop/restart/freeze/unfreeze)
+        # Both admins and assigned users are allowed to do this
         action = body.get("action", "").lower()
         if action:
             before_status = instance.status
@@ -337,7 +341,14 @@ class ContainerResource:
             return
 
         # Resource limit update
+        # ONLY admins are allowed to change RAM/CPU limits
         if "ram_mb" in body or "cpu_cores" in body:
+            if user["role"] != "admin":
+                raise falcon.HTTPForbidden(
+                    title="Access denied",
+                    description="Only administrators can modify container resource limits.",
+                )
+                
             config_updates = {}
             detail = {}
             if "ram_mb" in body:
