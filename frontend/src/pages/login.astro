@@ -2,10 +2,8 @@
 /**
  * Login page — shown to unauthenticated users.
  * 
- * Design: Centered card with Google sign-in button. No form fields needed
- * since we use OAuth — the user just clicks and authorizes on Google.
- * 
- * This is NOT behind AuthMiddleware (it's in the allowlist).
+ * Design: Centered card with Google sign-in button.
+ * Matches the strict, high-contrast monochrome Zinc aesthetic.
  */
 ---
 
@@ -18,17 +16,10 @@
     <meta name="description" content="Sign in to the Hobby Server Monitor admin dashboard" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="login-bg">
-      <!-- Animated background grid -->
-      <div class="grid-overlay" aria-hidden="true"></div>
-      
-      <!-- Glow orbs -->
-      <div class="orb orb-1" aria-hidden="true"></div>
-      <div class="orb orb-2" aria-hidden="true"></div>
-
       <div class="login-card" role="main">
         <!-- Logo / Brand -->
         <div class="brand">
@@ -42,35 +33,7 @@
           <h1 class="brand-name">Hobby Server Monitor</h1>
         </div>
 
-        <p class="tagline">LXD container management for your home lab</p>
-
-        <!-- Feature highlights -->
-        <ul class="features" aria-label="Features">
-          <li>
-            <svg viewBox="0 0 16 16" fill="currentColor">
-              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.749.749 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/>
-            </svg>
-            Real-time container metrics
-          </li>
-          <li>
-            <svg viewBox="0 0 16 16" fill="currentColor">
-              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.749.749 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/>
-            </svg>
-            Lifecycle management (start, stop, restart)
-          </li>
-          <li>
-            <svg viewBox="0 0 16 16" fill="currentColor">
-              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.749.749 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/>
-            </svg>
-            Role-based access control
-          </li>
-          <li>
-            <svg viewBox="0 0 16 16" fill="currentColor">
-              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.749.749 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/>
-            </svg>
-            Historical performance charts
-          </li>
-        </ul>
+        <p class="tagline">Sign in to manage your LXD infrastructure.</p>
 
         <!-- Sign-in button -->
         <a href="/api/auth/login" class="google-btn" id="signin-btn" role="button">
@@ -84,7 +47,7 @@
         </a>
 
         <p class="access-note">
-          Access is by invitation only. Contact an administrator if you need access.
+          Access is restricted to authorized administrators.
         </p>
       </div>
     </div>
@@ -94,8 +57,8 @@
 
       body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: #0d1117;
-        color: #e6edf3;
+        background: #09090b; /* Zinc 950 */
+        color: #fafafa;
         height: 100vh;
         overflow: hidden;
         -webkit-font-smoothing: antialiased;
@@ -107,110 +70,52 @@
         justify-content: center;
         height: 100vh;
         position: relative;
-      }
-
-      /* Subtle dot-grid background */
-      .grid-overlay {
-        position: absolute;
-        inset: 0;
-        background-image: radial-gradient(circle, rgba(48, 54, 61, 0.6) 1px, transparent 1px);
-        background-size: 28px 28px;
-        mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
-      }
-
-      /* Ambient glow orbs */
-      .orb {
-        position: absolute;
-        border-radius: 50%;
-        filter: blur(80px);
-        pointer-events: none;
-        animation: float 8s ease-in-out infinite;
-      }
-
-      .orb-1 {
-        width: 400px; height: 400px;
-        background: radial-gradient(circle, rgba(56, 139, 253, 0.15) 0%, transparent 70%);
-        top: -100px; left: -100px;
-      }
-
-      .orb-2 {
-        width: 350px; height: 350px;
-        background: radial-gradient(circle, rgba(188, 140, 255, 0.12) 0%, transparent 70%);
-        bottom: -80px; right: -60px;
-        animation-delay: -4s;
-      }
-
-      @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50%       { transform: translateY(-20px); }
+        background-image: radial-gradient(circle, rgba(39, 39, 42, 0.5) 1px, transparent 1px);
+        background-size: 24px 24px;
       }
 
       /* Login card */
       .login-card {
-        position: relative;
-        z-index: 10;
-        background: rgba(22, 27, 34, 0.95);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(48, 54, 61, 0.8);
-        border-radius: 20px;
+        background: #18181b; /* Zinc 900 */
+        border: 1px solid #27272a; /* Zinc 800 */
+        border-radius: 8px;
         padding: 40px;
-        width: min(400px, calc(100vw - 40px));
-        box-shadow:
-          0 0 0 1px rgba(255,255,255,0.04) inset,
-          0 20px 60px rgba(0,0,0,0.6);
+        width: min(380px, calc(100vw - 40px));
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
       }
 
       .brand {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 14px;
-        margin-bottom: 10px;
+        gap: 16px;
+        margin-bottom: 8px;
       }
 
       .brand-logo {
-        width: 44px; height: 44px;
-        background: linear-gradient(135deg, #388bfd 0%, #bc8cff 100%);
-        border-radius: 12px;
+        width: 48px; height: 48px;
+        background: #fafafa;
+        border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 4px 12px rgba(56, 139, 253, 0.3);
       }
 
-      .brand-logo svg { width: 24px; height: 24px; stroke: white; }
+      .brand-logo svg { width: 24px; height: 24px; stroke: #09090b; }
 
       .brand-name {
         font-size: 18px;
-        font-weight: 700;
-        line-height: 1.2;
-        color: #e6edf3;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: #fafafa;
       }
 
       .tagline {
         font-size: 13px;
-        color: #8b949e;
-        margin-bottom: 24px;
-        margin-top: 2px;
-      }
-
-      .features {
-        list-style: none;
-        margin-bottom: 28px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      .features li {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 13px;
-        color: #8b949e;
-      }
-
-      .features li svg {
-        width: 14px; height: 14px;
-        flex-shrink: 0;
-        color: #3fb950;
+        color: #a1a1aa;
+        margin-bottom: 32px;
       }
 
       .google-btn {
@@ -219,58 +124,45 @@
         justify-content: center;
         gap: 12px;
         width: 100%;
-        padding: 12px 20px;
-        background: #fff;
-        color: #3c4043;
-        border-radius: 10px;
-        font-size: 14px;
-        font-weight: 600;
+        padding: 10px 16px;
+        background: #fafafa;
+        color: #09090b;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
         font-family: inherit;
         text-decoration: none;
-        border: none;
+        border: 1px solid transparent;
         cursor: pointer;
-        transition: all 0.15s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        transition: background 0.15s ease;
         user-select: none;
       }
 
       .google-btn:hover {
-        background: #f8f8f8;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-        transform: translateY(-1px);
+        background: #e4e4e7; /* Zinc 200 */
       }
 
-      .google-btn:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      }
-
-      .google-btn svg { width: 20px; height: 20px; }
+      .google-btn svg { width: 18px; height: 18px; }
 
       .access-note {
-        margin-top: 16px;
+        margin-top: 24px;
         font-size: 11px;
-        color: #484f58;
-        text-align: center;
+        color: #71717a; /* Zinc 500 */
         line-height: 1.5;
       }
     </style>
 
     <script>
-      // If already authenticated, redirect to dashboard
       (async function() {
         try {
           const res = await fetch('/healthz');
           if (res.ok) {
-            // Check if we actually have a valid session
             const authRes = await fetch('/api/metrics/live');
             if (authRes.ok) {
               window.location.href = '/dashboard';
             }
           }
-        } catch (e) {
-          // Not authenticated, stay on login page
-        }
+        } catch (e) {}
       })();
     </script>
   </body>

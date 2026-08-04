@@ -41,24 +41,42 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     LXD is unreachable — showing last known state.
   </div>
 
-  <!-- Container grid -->
-  <div id="container-grid" class="container-grid">
-    <!-- Skeletons shown while loading -->
-    <div class="container-card skeleton-card">
-      <div class="skeleton" style="height:18px; width:120px; margin-bottom:8px;"></div>
-      <div class="skeleton" style="height:12px; width:80px; margin-bottom:16px;"></div>
-      <div class="skeleton" style="height:60px;"></div>
-    </div>
-    <div class="container-card skeleton-card">
-      <div class="skeleton" style="height:18px; width:140px; margin-bottom:8px;"></div>
-      <div class="skeleton" style="height:12px; width:60px; margin-bottom:16px;"></div>
-      <div class="skeleton" style="height:60px;"></div>
-    </div>
-    <div class="container-card skeleton-card">
-      <div class="skeleton" style="height:18px; width:100px; margin-bottom:8px;"></div>
-      <div class="skeleton" style="height:12px; width:90px; margin-bottom:16px;"></div>
-      <div class="skeleton" style="height:60px;"></div>
-    </div>
+  <!-- Container Table -->
+  <div class="table-container" id="container-table-wrapper">
+    <table id="container-table">
+      <thead>
+        <tr>
+          <th>Name / Image</th>
+          <th>Status</th>
+          <th>CPU</th>
+          <th>Memory</th>
+          <th>Network</th>
+          <th>Limits</th>
+          <th style="width: 80px; text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="container-tbody">
+        <!-- Skeletons shown while loading -->
+        <tr>
+          <td><div class="skeleton" style="height:14px; width:120px; margin-bottom:4px;"></div><div class="skeleton" style="height:10px; width:80px;"></div></td>
+          <td><div class="skeleton" style="height:20px; width:60px;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:28px; width:60px;"></div></td>
+        </tr>
+        <tr>
+          <td><div class="skeleton" style="height:14px; width:140px; margin-bottom:4px;"></div><div class="skeleton" style="height:10px; width:60px;"></div></td>
+          <td><div class="skeleton" style="height:20px; width:60px;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:14px; width:100%;"></div></td>
+          <td><div class="skeleton" style="height:28px; width:60px;"></div></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- Empty state -->
@@ -119,164 +137,72 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .lxd-status.connected .status-dot   { background: var(--status-running); box-shadow: 0 0 6px var(--status-running); }
   .lxd-status.error .status-dot       { background: var(--status-error); }
 
-  /* ── Container grid ──────────────────────────────────────────────────── */
-  .container-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-  }
-
-  .container-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-    cursor: pointer;
-    text-decoration: none;
-    color: inherit;
-    display: block;
-  }
-
-  .container-card:hover {
-    border-color: var(--border-default);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .container-card:hover .card-name { color: var(--accent-blue-light); }
-
-  .skeleton-card { cursor: default; }
-  .skeleton-card:hover { border-color: var(--border-subtle); box-shadow: none; }
-
-  .card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 16px;
-  }
-
-  .card-name {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
-    transition: color var(--transition-fast);
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .card-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 4px;
-    flex-wrap: wrap;
-  }
-
-  .card-image {
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  .card-ip {
-    font-size: 11px;
-    color: var(--text-muted);
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .card-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .icon-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    padding: 5px 7px;
-    cursor: pointer;
-    color: var(--text-secondary);
-    display: flex; align-items: center;
-    transition: all var(--transition-fast);
-  }
-
-  .icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
-  .icon-btn.danger:hover { border-color: var(--accent-red); color: var(--accent-red); background: rgba(248,81,73,0.1); }
-  .icon-btn svg { width: 14px; height: 14px; }
-
-  /* ── Resource stats ──────────────────────────────────────────────────── */
-  .card-stats {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .stat-row {
+  /* ── Table styles overrides (others inherit from BaseLayout) ──────────────── */
+  .container-name-col {
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
-
-  .stat-label-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .stat-label {
-    font-size: 11px;
+  .container-name-col .name {
+    font-size: 14px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-  }
-
-  .stat-value {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    text-decoration: none;
     font-family: 'JetBrains Mono', monospace;
   }
-
-  /* ── Stopped container overlay ───────────────────────────────────────── */
-  .stopped-overlay {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 20px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-md);
+  .container-name-col .name:hover {
+    color: var(--accent-blue-light);
+  }
+  .container-name-col .image {
+    font-size: 11px;
     color: var(--text-muted);
-    font-size: 13px;
   }
 
-  /* ── Limits row ─────────────────────────────────────────────────────── */
-  .limits-row {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .limit-item {
+  .stat-block {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 6px; /* Increased gap */
+    width: 140px; /* Increased width for better column alignment */
   }
-
-  .limit-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-  }
-
-  .limit-value {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
+  .stat-block .value {
+    font-size: 11px;
     font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+  }
+  
+  .net-block {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Increased gap */
+  }
+
+  .limits-block {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Increased gap */
+  }
+  .limits-block span {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+  }
+
+  .table-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  /* ── Stopped state row opacity ───────────────────────────────────────── */
+  tr.status-stopped td {
+    opacity: 0.7;
+  }
+  tr.status-stopped:hover td {
+    opacity: 1;
   }
 
   /* ── Empty state ─────────────────────────────────────────────────────── */
@@ -350,7 +276,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     return `<span class="badge ${map[status] || 'badge-stopped'}">${status}</span>`;
   }
 
-  function renderCard(container, metrics) {
+  function renderRow(container, metrics) {
     const name = container.name;
     const status = container.status;
     const isRunning = status === 'Running';
@@ -363,91 +289,60 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     const netRx = metrics?.net_rx_rate_bps ?? 0;
     const netTx = metrics?.net_tx_rate_bps ?? 0;
 
-    const statsHtml = isRunning ? `
-      <div class="card-stats">
-        <div class="stat-row">
-          <div class="stat-label-row">
-            <span class="stat-label">CPU</span>
-            <span class="stat-value">${cpu.toFixed(1)}%</span>
-          </div>
-          <div class="stat-bar"><div class="stat-bar-fill ${barColor(cpu)}" style="width:${cpu}%;"></div></div>
-        </div>
-        <div class="stat-row">
-          <div class="stat-label-row">
-            <span class="stat-label">RAM</span>
-            <span class="stat-value">${ramUsed} / ${limits.ram_mb ?? '?'} MB</span>
-          </div>
-          <div class="stat-bar"><div class="stat-bar-fill ${barColor(ramPct)}" style="width:${ramPct}%;"></div></div>
-        </div>
-        <div class="stat-row">
-          <div class="stat-label-row">
-            <span class="stat-label">Network</span>
-            <span class="stat-value">↓${formatBytes(netRx*8)}/s ↑${formatBytes(netTx*8)}/s</span>
-          </div>
-        </div>
-      </div>
-    ` : `
-      <div class="stopped-overlay">
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-          <path d="M4 4h8v8H4z"/>
-        </svg>
-        Container is ${status.toLowerCase()}
-      </div>
-    `;
-
-    const imageStr = container.image || '';
-    const ipStr = container.ipv4 ? `<span class="card-ip">${container.ipv4}</span>` : '';
-
-    // Only show start/stop if admin
     const actionBtns = currentUser?.role === 'admin' ? `
-      <div class="card-actions" id="actions-${name}">
+      <div class="table-actions" id="actions-${name}">
         ${isRunning ? `
-          <button class="icon-btn" onclick="event.preventDefault(); triggerAction('${name}', 'stop')" title="Stop container">
-            <svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
-          </button>
-          <button class="icon-btn" onclick="event.preventDefault(); triggerAction('${name}', 'restart')" title="Restart container">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-            </svg>
-          </button>
+          <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'stop')">Stop</button>
+          <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'restart')">Restart</button>
         ` : `
-          <button class="icon-btn" onclick="event.preventDefault(); triggerAction('${name}', 'start')" title="Start container">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
-          </button>
+          <button class="btn btn-sm btn-primary" onclick="event.preventDefault(); triggerAction('${name}', 'start')">Start</button>
         `}
       </div>
     ` : '';
 
     return `
-      <a href="/containers/detail?name=${name}" class="container-card">
-        <div class="card-header">
-          <div>
-            <div class="card-name">${name}</div>
-            <div class="card-meta">
-              ${statusBadge(status)}
-              <span class="card-image">${imageStr}</span>
-              ${ipStr}
+      <tr class="status-${status.toLowerCase()}" onclick="window.location.href='/containers/detail?name=${name}'" style="cursor: pointer;">
+        <td>
+          <div class="container-name-col">
+            <a href="/containers/detail?name=${name}" class="name" onclick="event.stopPropagation()">${name}</a>
+            <span class="image">${container.image || '-'}</span>
+          </div>
+        </td>
+        <td>${statusBadge(status)}</td>
+        <td>
+          ${isRunning ? `
+            <div class="stat-block">
+              <span class="value">${cpu.toFixed(1)}%</span>
+              <div class="stat-bar"><div class="stat-bar-fill ${barColor(cpu)}" style="width:${cpu}%;"></div></div>
             </div>
+          ` : `<span style="color:var(--text-muted);font-size:11px;">-</span>`}
+        </td>
+        <td>
+          ${isRunning ? `
+            <div class="stat-block">
+              <span class="value">${ramUsed} / ${limits.ram_mb ?? '?'} MB</span>
+              <div class="stat-bar"><div class="stat-bar-fill ${barColor(ramPct)}" style="width:${ramPct}%;"></div></div>
+            </div>
+          ` : `<span style="color:var(--text-muted);font-size:11px;">-</span>`}
+        </td>
+        <td>
+          ${isRunning ? `
+            <div class="net-block">
+              <span>↓ ${formatBytes(netRx*8)}/s</span>
+              <span>↑ ${formatBytes(netTx*8)}/s</span>
+            </div>
+          ` : `<span style="color:var(--text-muted);font-size:11px;">-</span>`}
+        </td>
+        <td>
+          <div class="limits-block">
+            <div>CPU: <span>${limits.cpu_cores ?? '?'}</span></div>
+            <div>IP: <span>${container.ipv4 || '-'}</span></div>
           </div>
+        </td>
+        <td onclick="event.stopPropagation()">
           ${actionBtns}
-        </div>
-        ${statsHtml}
-        <div class="limits-row">
-          <div class="limit-item">
-            <span class="limit-label">CPU</span>
-            <span class="limit-value">${limits.cpu_cores ?? '?'} cores</span>
-          </div>
-          <div class="limit-item">
-            <span class="limit-label">RAM</span>
-            <span class="limit-value">${limits.ram_mb ?? '?'} MB</span>
-          </div>
-          <div class="limit-item">
-            <span class="limit-label">Disk</span>
-            <span class="limit-value">${limits.disk_gb ?? '?'} GB</span>
-          </div>
-          ${container.ipv4 ? `<div class="limit-item"><span class="limit-label">IP</span><span class="limit-value" style="font-size:10px;">${container.ipv4}</span></div>` : ''}
-        </div>
-      </a>
+        </td>
+      </tr>
     `;
   }
 
@@ -507,20 +402,22 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         containers[m.container].status = m.status || containers[m.container].status;
       });
 
-      // Render cards
-      const grid = document.getElementById('container-grid');
+      // Render table rows
+      const tableWrapper = document.getElementById('container-table-wrapper');
+      const tbody = document.getElementById('container-tbody');
       const emptyState = document.getElementById('empty-state');
       const names = Object.keys(containers);
 
       if (names.length === 0) {
-        if (grid) grid.innerHTML = '';
+        if (tableWrapper) tableWrapper.style.display = 'none';
         if (emptyState) emptyState.style.display = 'flex';
       } else {
         if (emptyState) emptyState.style.display = 'none';
-        if (grid) {
-          grid.innerHTML = names
+        if (tableWrapper) tableWrapper.style.display = 'block';
+        if (tbody) {
+          tbody.innerHTML = names
             .sort()
-            .map(name => renderCard(containers[name], metricsMap[name]))
+            .map(name => renderRow(containers[name], metricsMap[name]))
             .join('');
         }
       }

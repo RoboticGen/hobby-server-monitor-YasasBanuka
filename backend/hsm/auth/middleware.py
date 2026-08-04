@@ -49,6 +49,12 @@ class AuthMiddleware:
     def process_request(self, req: falcon.Request, resp: falcon.Response) -> None:
         path = req.path
 
+        # Only enforce authentication on API routes.
+        # Static frontend files (Astro HTML/JS/CSS) do not need backend authentication,
+        # the UI itself will redirect the user to login if API calls fail.
+        if not path.startswith("/api/"):
+            return
+
         # Check if the path is on the allowlist
         if path in ALLOWLIST:
             return

@@ -130,7 +130,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         if (e.detail) {
           try {
             const parsed = JSON.parse(e.detail);
-            detail = `<button class="detail-toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">details</button>
+            detail = `<button class="btn btn-sm btn-secondary" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">Details</button>
               <pre class="detail-pre">${JSON.stringify(parsed, null, 2)}</pre>`;
           } catch { detail = `<span style="font-size:11px;color:var(--text-muted)">${e.detail}</span>`; }
         }
