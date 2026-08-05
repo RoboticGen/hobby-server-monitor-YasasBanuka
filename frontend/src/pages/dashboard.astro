@@ -290,17 +290,19 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     const netTx = metrics?.net_tx_rate_bps ?? 0;
 
     let actionBtns = '';
-    if (status === 'Running') {
-      actionBtns = `
-        <div class="table-actions" id="actions-${name}">
-          <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'stop')">Stop</button>
-          <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'restart')">Restart</button>
-        </div>`;
-    } else {
-      actionBtns = `
-        <div class="table-actions" id="actions-${name}">
-          <button class="btn btn-sm btn-primary" onclick="event.preventDefault(); triggerAction('${name}', 'start')">Start</button>
-        </div>`;
+    if (currentUser?.role === 'admin') {
+      if (status === 'Running') {
+        actionBtns = `
+          <div class="table-actions" id="actions-${name}">
+            <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'stop')">Stop</button>
+            <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'restart')">Restart</button>
+          </div>`;
+      } else {
+        actionBtns = `
+          <div class="table-actions" id="actions-${name}">
+            <button class="btn btn-sm btn-primary" onclick="event.preventDefault(); triggerAction('${name}', 'start')">Start</button>
+          </div>`;
+      }
     }
 
     return `

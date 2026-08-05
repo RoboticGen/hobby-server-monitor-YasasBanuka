@@ -225,9 +225,16 @@ class ContainerCollectionResource:
             "SELECT quota_ram_mb, quota_cpu_cores, quota_disk_gb FROM users WHERE id = ?",
             (user["id"],),
         ).fetchone()
-        user_quota = dict(user_row) if user_row else {
-            "quota_ram_mb": 99999, "quota_cpu_cores": 99999, "quota_disk_gb": 99999
-        }
+        
+        if user["role"] == "admin":
+            user_quota = {
+                "quota_ram_mb": 999999, "quota_cpu_cores": 9999, "quota_disk_gb": 99999
+            }
+        else:
+            user_quota = dict(user_row) if user_row else {
+                "quota_ram_mb": 0, "quota_cpu_cores": 0, "quota_disk_gb": 0
+            }
+        
         user_allocation = _get_user_allocation(user["id"])
 
         # Validate
@@ -295,13 +302,11 @@ class ContainerResource:
         meta = db.execute("SELECT * FROM containers WHERE name = ?", (name,)).fetchone()
         resp.media = _serialize_instance(instance, dict(meta) if meta else None)
 
+    @require_role("admin")
     def on_patch(self, req: falcon.Request, resp: falcon.Response, name: str) -> None:
-        """Update container config (admin) or trigger a lifecycle action (admin or assigned user)."""
+        """Update container config or trigger a lifecycle action."""
         user = req.context.user
         name = validate_container_name(name)
-        
-        # Ensures user is either an admin, or specifically assigned to this container
-        check_container_access(req, name)
         
         body = req.media or {}
 
@@ -312,7 +317,6 @@ class ContainerResource:
             raise falcon.HTTPNotFound(title="Container not found")
 
         # Lifecycle action (start/stop/restart/freeze/unfreeze)
-        # Both admins and assigned users are allowed to do this
         action = body.get("action", "").lower()
         if action:
             before_status = instance.status
