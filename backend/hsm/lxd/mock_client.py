@@ -285,6 +285,14 @@ class _MockState:
                 },
             }
         } if data.get("status") == "Running" else {}
+        
+        # Simulate disk usage (defaulting to 3.5GB used + some noise if Running)
+        base_disk_bytes = (3.5 * 1024**3) + (random.uniform(-0.1, 0.1) * 1024**3) if data.get("status") == "Running" else 0
+        self.disk = {
+            "root": {
+                "usage": int(base_disk_bytes)
+            }
+        }
 
 
 class _MockCPU:

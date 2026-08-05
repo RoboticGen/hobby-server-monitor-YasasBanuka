@@ -100,11 +100,13 @@ def _collect_one(instance) -> dict | None:
             if size_str.endswith("GB"):
                 disk_limit_gb = int(size_str[:-2])
             break
-    # Note: LXD's state() doesn't reliably expose disk usage per container.
-    # We report disk_limit_gb from config and disk_used_gb as 0 unless we
-    # can get it another way (e.g., via pylxd files or custom script).
-    # Documented as a known limitation.
+    # Note: LXD's state() disk usage is dependent on the storage driver (ZFS/btrfs).
+    # We will attempt to read it if provided, otherwise it stays 0.
     disk_used_gb = 0.0
+    if state and hasattr(state, "disk") and state.disk:
+        root_disk = state.disk.get("root")
+        if root_disk and "usage" in root_disk:
+            disk_used_gb = float(root_disk["usage"]) / (1024**3)
 
     # ── Network ───────────────────────────────────────────────────────────────
     net_rx_bytes = 0

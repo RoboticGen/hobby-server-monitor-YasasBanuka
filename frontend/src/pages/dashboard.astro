@@ -89,7 +89,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <th>CPU</th>
           <th>Memory</th>
           <th>Network</th>
-          <th>Limits</th>
+          <th>Disk</th>
           <th style="width: 80px; text-align: right;">Actions</th>
         </tr>
       </thead>
@@ -327,6 +327,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     const ramUsed = metrics?.ram_used_mb ?? 0;
     const ramLimit = limits.ram_mb || 1;
     const ramPct = Math.min(100, (ramUsed / ramLimit) * 100);
+    const diskUsed = metrics?.disk_used_gb ?? 0;
+    const diskLimit = limits.disk_gb || 1;
+    const diskPct = Math.min(100, (diskUsed / diskLimit) * 100);
     const netRx = metrics?.net_rx_rate_bps ?? 0;
     const netTx = metrics?.net_tx_rate_bps ?? 0;
 
