@@ -26,24 +26,31 @@ from hsm.auth.middleware import check_container_access
 from hsm.tsdb import get_metric_history
 
 
-# Module-level cache: populated by the collector process.
-# The collector imports this module and updates _LIVE_CACHE directly.
-# The API reads from it. No lock needed because Python's GIL protects dict
-# reads/writes in CPython, and the write is a single dict assignment.
+import json
+import os
+
+# Module-level cache: used as a fallback if the file cannot be read
 _LIVE_CACHE: dict = {}
 
+LIVE_CACHE_PATH = os.environ.get("LIVE_CACHE_PATH", "data/live_cache.json")
+
+def _read_live_cache() -> dict:
+    """Read the live cache from the JSON file written by the collector."""
+    try:
+        if os.path.exists(LIVE_CACHE_PATH):
+            with open(LIVE_CACHE_PATH, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return _LIVE_CACHE
 
 def update_live_cache(container_name: str, metrics: dict) -> None:
-    """Called by the collector to update the live snapshot cache."""
-    _LIVE_CACHE[container_name] = {
-        **metrics,
-        "cached_at": datetime.now(tz=timezone.utc).isoformat(),
-    }
-
+    # No-op: The collector writes to the JSON file directly.
+    pass
 
 def remove_from_live_cache(container_name: str) -> None:
-    """Called when a container is deleted."""
-    _LIVE_CACHE.pop(container_name, None)
+    # No-op: The collector rewrites the JSON file every cycle.
+    pass
 
 
 # Parse human-readable time range strings like "1h", "24h", "7d"
@@ -67,10 +74,12 @@ class LiveMetricsResource:
         user = req.context.user
         db = get_db()
 
+        live_data = _read_live_cache()
+
         if user["role"] == "admin":
             # Admin: return all cached containers
             resp.media = {
-                "metrics": list(_LIVE_CACHE.values()),
+                "metrics": list(live_data.values()),
                 "lxd_available": True,
             }
         else:
@@ -83,7 +92,7 @@ class LiveMetricsResource:
                 ).fetchall()
             }
             filtered = {
-                k: v for k, v in _LIVE_CACHE.items() if k in assigned
+                k: v for k, v in live_data.items() if k in assigned
             }
             resp.media = {
                 "metrics": list(filtered.values()),
