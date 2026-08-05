@@ -92,7 +92,10 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       </div>
 
       <div class="card">
-        <h2 class="card-section-title" style="margin-bottom:14px;">Configuration</h2>
+        <div class="card-toolbar" style="margin-bottom:14px;">
+          <h2 class="card-section-title">Configuration</h2>
+          <button id="btn-edit-config" class="btn btn-sm btn-secondary" style="display:none;" onclick="openEditModal()">Edit Limits</button>
+        </div>
         <div class="stat-item"><span class="stat-item-label">Image</span><span class="stat-item-value" id="cfg-image">—</span></div>
         <div class="stat-item"><span class="stat-item-label">CPU Limit</span><span class="stat-item-value" id="cfg-cpu">—</span></div>
         <div class="stat-item"><span class="stat-item-label">RAM Limit</span><span class="stat-item-value" id="cfg-ram">—</span></div>
@@ -103,6 +106,39 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       </div>
     </div>
   </div>
+
+  <dialog id="edit-modal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+      <h2 class="modal-title">Edit Container Limits</h2>
+      <p class="modal-desc">Adjust the resource constraints for this container.</p>
+      
+      <form id="edit-form" class="form-layout">
+        <div class="form-group">
+          <label class="form-label" for="edit-cpu">CPU Cores</label>
+          <input type="number" id="edit-cpu" class="form-input" min="1" required />
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="edit-ram">RAM (MB)</label>
+          <input type="number" id="edit-ram" class="form-input" min="64" step="64" required />
+        </div>
+        
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="edit-autostart" class="form-checkbox" />
+            <span class="checkbox-text">Autostart on boot</span>
+          </label>
+        </div>
+
+        <div id="edit-error" class="alert alert-error" style="display:none; margin-top: 10px;"></div>
+
+        <div class="modal-actions" style="margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="edit-submit-btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
 </BaseLayout>
 
 <style>
@@ -228,6 +264,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   let chartInstance = null;
   let commandHistory = [];
   let historyIndex = -1;
+  let currentContainerData = null;
 
   function formatBytes(bytes) {
     if (bytes < 1024) return `${bytes} B`;
@@ -259,6 +296,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       document.getElementById('cfg-created').textContent = new Date(c.created_at).toLocaleString();
       if (c.ipv4) document.getElementById('stat-ip').textContent = c.ipv4;
 
+      currentContainerData = c;
       await renderActionButtons(c);
 
       const termUI = document.getElementById('terminal-ui');
@@ -279,6 +317,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if (!userRes.ok) return;
       const user = await userRes.json();
       if (user.role !== 'admin') return;
+
+      document.getElementById('btn-edit-config').style.display = 'block';
 
       const btns = document.getElementById('action-buttons');
       const isRunning = container.status === 'Running';
@@ -307,6 +347,57 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   }
 
   window.doAction = doAction;
+
+  const editModal = document.getElementById('edit-modal');
+  const editForm = document.getElementById('edit-form');
+  const editError = document.getElementById('edit-error');
+  const editSubmitBtn = document.getElementById('edit-submit-btn');
+
+  window.openEditModal = () => {
+    if (!currentContainerData) return;
+    document.getElementById('edit-cpu').value = currentContainerData.limits?.cpu_cores || 1;
+    document.getElementById('edit-ram').value = currentContainerData.limits?.ram_mb || 512;
+    document.getElementById('edit-autostart').checked = currentContainerData.autostart;
+    editError.style.display = 'none';
+    editModal.showModal();
+  };
+
+  window.closeEditModal = () => {
+    editModal.close();
+  };
+
+  editForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    editError.style.display = 'none';
+    editSubmitBtn.disabled = true;
+    editSubmitBtn.textContent = 'Saving...';
+
+    const payload = {
+      cpu_cores: parseInt(document.getElementById('edit-cpu').value, 10),
+      ram_mb: parseInt(document.getElementById('edit-ram').value, 10),
+      autostart: document.getElementById('edit-autostart').checked
+    };
+
+    try {
+      const res = await fetch(`/api/containers/${containerName}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.description || 'Failed to update container.');
+      }
+      closeEditModal();
+      await loadContainer();
+    } catch (err) {
+      editError.textContent = err.message;
+      editError.style.display = 'block';
+    } finally {
+      editSubmitBtn.disabled = false;
+      editSubmitBtn.textContent = 'Save Changes';
+    }
+  });
 
   async function pollMetrics() {
     try {

@@ -346,7 +346,7 @@ class ContainerResource:
 
         # Resource limit update
         # ONLY admins are allowed to change RAM/CPU limits
-        if "ram_mb" in body or "cpu_cores" in body:
+        if "ram_mb" in body or "cpu_cores" in body or "autostart" in body:
             if user["role"] != "admin":
                 raise falcon.HTTPForbidden(
                     title="Access denied",
@@ -363,6 +363,10 @@ class ContainerResource:
                 cpu_cores = int(body["cpu_cores"])
                 config_updates["limits.cpu"] = str(cpu_cores)
                 detail["cpu_cores"] = cpu_cores
+            if "autostart" in body:
+                autostart = bool(body["autostart"])
+                config_updates["boot.autostart"] = "true" if autostart else "false"
+                detail["autostart"] = autostart
 
             instance.config.update(config_updates)
             try:
