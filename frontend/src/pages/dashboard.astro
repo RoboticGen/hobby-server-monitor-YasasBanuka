@@ -446,20 +446,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
     let totalAllocatedRam = 0;
     let totalAllocatedCpu = 0;
+    let totalAllocatedDisk = 0;
 
     containers.forEach(c => {
       if (c.limits) {
         totalAllocatedRam += (c.limits.ram_mb || 0);
         totalAllocatedCpu += (c.limits.cpu_cores || 0);
+        totalAllocatedDisk += (c.limits.disk_gb || 0);
       }
     });
 
     const ramPct = Math.min(100, Math.round((totalAllocatedRam / hostCapacity.ram_mb) * 100)) || 0;
     const cpuPct = Math.min(100, Math.round((totalAllocatedCpu / hostCapacity.cpu_cores) * 100)) || 0;
+    const diskPct = Math.min(100, Math.round((totalAllocatedDisk / hostCapacity.disk_gb) * 100)) || 0;
 
     document.getElementById('host-ram-text').textContent = `${totalAllocatedRam} MB / ${hostCapacity.ram_mb} MB (${ramPct}%)`;
     document.getElementById('host-cpu-text').textContent = `${totalAllocatedCpu} / ${hostCapacity.cpu_cores} Cores (${cpuPct}%)`;
-    document.getElementById('host-disk-text').textContent = `Total Capacity: ${hostCapacity.disk_gb} GB`;
+    document.getElementById('host-disk-text').textContent = `${totalAllocatedDisk} GB / ${hostCapacity.disk_gb} GB (${diskPct}%)`;
 
     const ramBar = document.getElementById('host-ram-bar');
     ramBar.style.width = `${ramPct}%`;
@@ -472,6 +475,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     if (cpuPct >= 100) cpuBar.style.background = 'var(--accent-red)';
     else if (cpuPct >= 85) cpuBar.style.background = 'var(--accent-yellow)';
     else cpuBar.style.background = 'var(--accent-blue-light)';
+
+    const diskBar = document.getElementById('host-disk-bar');
+    diskBar.style.width = `${diskPct}%`;
+    diskBar.style.opacity = '1';
+    if (diskPct >= 100) diskBar.style.background = 'var(--accent-red)';
+    else if (diskPct >= 85) diskBar.style.background = 'var(--accent-yellow)';
+    else diskBar.style.background = 'var(--accent-green)';
   }
 
   async function pollMetrics() {
