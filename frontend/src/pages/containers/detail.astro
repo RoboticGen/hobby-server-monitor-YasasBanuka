@@ -510,6 +510,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         empty.textContent = `Chart Error: ${e.message}`;
       }
     }
+  }
+
   document.querySelectorAll('.range-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
