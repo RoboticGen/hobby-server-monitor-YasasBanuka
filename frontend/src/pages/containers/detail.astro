@@ -114,12 +114,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       
       <form id="edit-form" class="form-layout">
         <div class="form-group">
-          <label class="form-label" for="edit-cpu">CPU Cores</label>
+          <label class="form-label" for="edit-cpu">CPU Cores <span id="edit-cpu-max-label" style="font-size: 11px; color: var(--text-muted); float: right;"></span></label>
           <input type="number" id="edit-cpu" class="form-input" min="1" required />
         </div>
         
         <div class="form-group">
-          <label class="form-label" for="edit-ram">RAM (MB)</label>
+          <label class="form-label" for="edit-ram">RAM (MB) <span id="edit-ram-max-label" style="font-size: 11px; color: var(--text-muted); float: right;"></span></label>
           <input type="number" id="edit-ram" class="form-input" min="64" step="64" required />
         </div>
         
@@ -353,13 +353,37 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   const editError = document.getElementById('edit-error');
   const editSubmitBtn = document.getElementById('edit-submit-btn');
 
-  window.openEditModal = () => {
+  window.openEditModal = async () => {
     if (!currentContainerData) return;
-    document.getElementById('edit-cpu').value = currentContainerData.limits?.cpu_cores || 1;
-    document.getElementById('edit-ram').value = currentContainerData.limits?.ram_mb || 512;
+    
+    const cpuInput = document.getElementById('edit-cpu');
+    const ramInput = document.getElementById('edit-ram');
+    const cpuLabel = document.getElementById('edit-cpu-max-label');
+    const ramLabel = document.getElementById('edit-ram-max-label');
+    
+    cpuLabel.textContent = 'Loading host capacity...';
+    ramLabel.textContent = '';
+    
+    cpuInput.value = currentContainerData.limits?.cpu_cores || 1;
+    ramInput.value = currentContainerData.limits?.ram_mb || 512;
     document.getElementById('edit-autostart').checked = currentContainerData.autostart;
     editError.style.display = 'none';
     editModal.showModal();
+
+    try {
+      const res = await fetch('/api/host/capacity');
+      if (res.ok) {
+        const capacity = await res.json();
+        cpuInput.max = capacity.cpu_cores;
+        ramInput.max = capacity.ram_mb;
+        cpuLabel.textContent = `(Max: ${capacity.cpu_cores})`;
+        ramLabel.textContent = `(Max: ${capacity.ram_mb} MB)`;
+      } else {
+        cpuLabel.textContent = '';
+      }
+    } catch (e) {
+      cpuLabel.textContent = '';
+    }
   };
 
   window.closeEditModal = () => {

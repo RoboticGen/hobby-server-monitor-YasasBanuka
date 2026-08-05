@@ -355,14 +355,32 @@ class ContainerResource:
                 
             config_updates = {}
             detail = {}
+            
+            import os
+            host_capacity = {
+                "ram_mb": int(open("/proc/meminfo").read().split("MemTotal:")[1].split()[0]) // 1024
+                          if os.path.exists("/proc/meminfo") else 8192,
+                "cpu_cores": os.cpu_count() or 4,
+            }
+
             if "ram_mb" in body:
                 ram_mb = int(body["ram_mb"])
+                if ram_mb < 64:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description="ram_mb must be at least 64.")
+                if ram_mb > host_capacity["ram_mb"]:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description=f"ram_mb exceeds host capacity ({host_capacity['ram_mb']} MB).")
                 config_updates["limits.memory"] = f"{ram_mb}MB"
                 detail["ram_mb"] = ram_mb
+                
             if "cpu_cores" in body:
                 cpu_cores = int(body["cpu_cores"])
+                if cpu_cores < 1:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description="cpu_cores must be at least 1.")
+                if cpu_cores > host_capacity["cpu_cores"]:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description=f"cpu_cores exceeds host capacity ({host_capacity['cpu_cores']} cores).")
                 config_updates["limits.cpu"] = str(cpu_cores)
                 detail["cpu_cores"] = cpu_cores
+                
             if "autostart" in body:
                 autostart = bool(body["autostart"])
                 config_updates["boot.autostart"] = "true" if autostart else "false"
