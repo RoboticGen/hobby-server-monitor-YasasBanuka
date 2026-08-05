@@ -33,6 +33,44 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
   </div>
 
+  <!-- Host Node Overview -->
+  <div class="card" id="host-overview-card" style="display:none; margin-bottom: 24px; padding: 20px;">
+    <h2 class="card-section-title" style="margin-bottom: 16px;">Host Node Overview (Allocation vs Capacity)</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px;">
+      
+      <div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:600; color:var(--text-color);">RAM Allocation</span>
+          <span style="font-size:12px; color:var(--text-muted);" id="host-ram-text">—</span>
+        </div>
+        <div style="height:8px; background:var(--bg-secondary); border-radius:4px; overflow:hidden;">
+          <div id="host-ram-bar" style="height:100%; width:0%; background:var(--brand-primary); transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:600; color:var(--text-color);">CPU Core Allocation</span>
+          <span style="font-size:12px; color:var(--text-muted);" id="host-cpu-text">—</span>
+        </div>
+        <div style="height:8px; background:var(--bg-secondary); border-radius:4px; overflow:hidden;">
+          <div id="host-cpu-bar" style="height:100%; width:0%; background:var(--brand-secondary); transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:600; color:var(--text-color);">Disk Space</span>
+          <span style="font-size:12px; color:var(--text-muted);" id="host-disk-text">—</span>
+        </div>
+        <div style="height:8px; background:var(--bg-secondary); border-radius:4px; overflow:hidden;">
+          <div id="host-disk-bar" style="height:100%; width:100%; background:var(--success-color); opacity: 0.5;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- LXD unavailable banner -->
   <div class="alert alert-warning" id="lxd-warning" style="display:none;">
     <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
@@ -290,7 +328,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     const netTx = metrics?.net_tx_rate_bps ?? 0;
 
     let actionBtns = '';
-    if (currentUser?.role === 'admin') {
+    if (currentUserRole === 'admin') {
       if (status === 'Running') {
         actionBtns = `
           <div class="table-actions" id="actions-${name}">
@@ -357,8 +395,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       if (res.status === 401) { window.location.href = '/login'; return; }
       if (!res.ok) return;
       const data = await res.json();
+      lastContainers = data.containers;
       // Build a map by name
       data.containers.forEach(c => { containers[c.name] = c; });
+      updateHostOverview(data.containers);
     } catch (e) {
       console.error('Failed to load containers:', e);
     }
@@ -368,13 +408,61 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     try {
       const res = await fetch('/api/users/me');
       if (!res.ok) return;
-      currentUser = await res.json();
-      // Show admin-only buttons
-      if (currentUser.role === 'admin') {
-        document.getElementById('create-btn')?.style.setProperty('display', 'flex');
-        document.getElementById('empty-create-btn')?.style.setProperty('display', 'flex');
+      const user = await res.json();
+      currentUser = user;
+      currentUserRole = user.role;
+      if (currentUserRole === 'admin') {
+        document.getElementById('create-btn')?.style.setProperty('display', 'inline-flex');
+        document.getElementById('empty-create-btn')?.style.setProperty('display', 'inline-flex');
+        document.getElementById('host-overview-card')?.style.setProperty('display', 'block');
+        fetchHostCapacity();
       }
     } catch (e) {}
+  }
+
+  async function fetchHostCapacity() {
+    try {
+      const res = await fetch('/api/host/capacity');
+      if (res.ok) {
+        hostCapacity = await res.json();
+        updateHostOverview(Object.values(containers));
+      }
+    } catch (e) {
+      console.error("Failed to fetch host capacity:", e);
+    }
+  }
+
+  function updateHostOverview(containers) {
+    if (!hostCapacity || currentUserRole !== 'admin') return;
+
+    let totalAllocatedRam = 0;
+    let totalAllocatedCpu = 0;
+
+    containers.forEach(c => {
+      if (c.limits) {
+        totalAllocatedRam += (c.limits.ram_mb || 0);
+        totalAllocatedCpu += (c.limits.cpu_cores || 0);
+      }
+    });
+
+    const ramPct = Math.min(100, Math.round((totalAllocatedRam / hostCapacity.ram_mb) * 100)) || 0;
+    const cpuPct = Math.min(100, Math.round((totalAllocatedCpu / hostCapacity.cpu_cores) * 100)) || 0;
+
+    document.getElementById('host-ram-text').textContent = `${totalAllocatedRam} MB / ${hostCapacity.ram_mb} MB (${ramPct}%)`;
+    document.getElementById('host-cpu-text').textContent = `${totalAllocatedCpu} / ${hostCapacity.cpu_cores} Cores (${cpuPct}%)`;
+    document.getElementById('host-disk-text').textContent = `Total Capacity: ${hostCapacity.disk_gb} GB`;
+
+    const ramBar = document.getElementById('host-ram-bar');
+    ramBar.style.width = `${ramPct}%`;
+    if (ramPct >= 100) ramBar.style.background = 'var(--accent-red)';
+    else if (ramPct >= 85) ramBar.style.background = 'var(--accent-yellow)';
+    else ramBar.style.background = 'var(--accent-blue-light)';
+
+    const cpuBar = document.getElementById('host-cpu-bar');
+    cpuBar.style.width = `${cpuPct}%`;
+    if (cpuPct >= 100) cpuBar.style.background = 'var(--accent-red)';
+    else if (cpuPct >= 85) cpuBar.style.background = 'var(--accent-yellow)';
+    else cpuBar.style.background = 'var(--accent-blue-light)';
   }
 
   async function pollMetrics() {
