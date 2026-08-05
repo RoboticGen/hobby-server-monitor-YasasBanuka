@@ -127,7 +127,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </svg>
     </div>
     <h3>No containers yet</h3>
-    <p>Create your first container to get started.</p>
+    <p id="empty-state-text">Loading...</p>
     <a href="/containers/create" class="btn btn-primary" id="empty-create-btn" style="display:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
@@ -286,7 +286,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
    */
 
   let currentUser = null;
+  let currentUserRole = null;
   let containers = {};  // name → container data
+  let lastContainers = [];
+  let hostCapacity = null;
   let lxdAvailable = true;
   let pollTimer = null;
 
@@ -411,11 +414,17 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       const user = await res.json();
       currentUser = user;
       currentUserRole = user.role;
+      
+      const emptyStateText = document.getElementById('empty-state-text');
+      
       if (currentUserRole === 'admin') {
+        if (emptyStateText) emptyStateText.textContent = 'Create your first container to get started.';
         document.getElementById('create-btn')?.style.setProperty('display', 'inline-flex');
         document.getElementById('empty-create-btn')?.style.setProperty('display', 'inline-flex');
         document.getElementById('host-overview-card')?.style.setProperty('display', 'block');
         fetchHostCapacity();
+      } else {
+        if (emptyStateText) emptyStateText.textContent = 'You have no containers assigned to you. Please contact your administrator.';
       }
     } catch (e) {}
   }
