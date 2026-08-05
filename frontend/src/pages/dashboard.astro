@@ -383,10 +383,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           ` : `<span style="color:var(--text-muted);font-size:11px;">-</span>`}
         </td>
         <td>
-          <div class="limits-block">
-            <div>CPU: <span>${limits.cpu_cores ?? '?'}</span></div>
-            <div>IP: <span>${container.ipv4 || '-'}</span></div>
-          </div>
+          ${isRunning ? `
+            <div class="stat-block">
+              <span class="value">${diskUsed.toFixed(1)} / ${limits.disk_gb ?? '?'} GB</span>
+              <div class="stat-bar"><div class="stat-bar-fill ${barColor(diskPct)}" style="width:${diskPct}%;"></div></div>
+            </div>
+          ` : `<span style="color:var(--text-muted);font-size:11px;">-</span>`}
         </td>
         <td onclick="event.stopPropagation()">
           ${actionBtns}
