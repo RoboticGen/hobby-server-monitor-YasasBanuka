@@ -353,7 +353,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if (input !== null) alert("Name did not match. Deletion cancelled.");
       return;
     }
-    const res = await fetch(`/api/containers/${containerName}?force=true`, { method: 'DELETE' });
+    const res = await fetch(`/api/containers/${containerName}`, { method: 'DELETE' });
     if (!res.ok) { 
       const err = await res.json(); 
       alert(`Failed to delete: ${err.description || err.error}`); 

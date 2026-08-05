@@ -423,7 +423,7 @@ class ContainerResource:
                 description=(
                     f"This container is assigned to: "
                     f"{', '.join(r['email'] for r in assignments)}. "
-                    f"Unassign first, or pass ?force=true to cascade-delete assignments."
+                    f"Unassign from users first to delete."
                 ),
             )
 
