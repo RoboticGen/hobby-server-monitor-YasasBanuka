@@ -499,7 +499,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         scales: { x: {}, y: { range: [0, 100] }, ram: {} },
         axes: [
           { stroke: '#484f58', ticks: { stroke: '#21262d' }, grid: { stroke: '#21262d' } },
-          { stroke: '#484f58', ticks: { stroke: '#21262d' }, grid: { stroke: '#21262d' }, label: 'CPU %' },
+          { stroke: '#388bfd', ticks: { stroke: '#21262d' }, grid: { stroke: '#21262d' }, label: 'CPU %' },
           { scale: 'ram', side: 1, stroke: '#3fb950', ticks: { stroke: '#21262d' }, grid: { show: false }, label: 'RAM MB' },
         ],
       }, [timestamps, cpuValues, ramValues], container);
