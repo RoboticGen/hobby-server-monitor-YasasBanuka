@@ -202,6 +202,22 @@ class _MockInstance:
         _MOCK_CONTAINERS[self.name] = self._data
 
     def state(self) -> "_MockState":
+        import random
+        # Randomize mock stats slightly for live feel
+        if self._data.get("status") == "Running":
+            self._data["cpu_usage"] = max(0, min(100, self._data.get("cpu_usage", 10) + random.uniform(-2, 2)))
+            
+            ram_max = 1024
+            mem_str = self._data.get("config", {}).get("limits.memory", "1024MB")
+            if mem_str.endswith("MB"): ram_max = int(mem_str[:-2])
+            elif mem_str.endswith("GB"): ram_max = int(mem_str[:-2]) * 1024
+            
+            self._data["ram_used_mb"] = max(10, min(ram_max, self._data.get("ram_used_mb", 100) + random.randint(-10, 10)))
+            
+            # Increment network counters so rates are > 0
+            self._data["net_rx_bytes"] = self._data.get("net_rx_bytes", 0) + random.randint(1000, 50000)
+            self._data["net_tx_bytes"] = self._data.get("net_tx_bytes", 0) + random.randint(1000, 20000)
+
         return _MockState(self._data)
 
     def start(self, wait: bool = True) -> None:
