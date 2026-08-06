@@ -150,21 +150,35 @@ class UserCollectionResource:
                     "to": [email],
                     "subject": "You've been invited to the Server Monitor Dashboard",
                     "html": f"""
-                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-                        <h2>Welcome!</h2>
-                        <p><strong>{actor['email']}</strong> has invited you to access the Hobby Server Monitor.</p>
-                        <p>You have been granted a <strong>{role}</strong> role with a resource quota of:</p>
-                        <ul>
-                            <li><strong>RAM:</strong> {quota_ram} MB</li>
-                            <li><strong>CPU:</strong> {quota_cpu} Cores</li>
-                            <li><strong>Disk:</strong> {quota_disk} GB</li>
-                        </ul>
-                        <p style="margin-top: 30px;">
-                            <a href="http://localhost:4321/login" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Sign In via Google</a>
-                        </p>
-                        <p style="margin-top: 30px; font-size: 12px; color: #777;">
-                            Make sure to sign in with your <strong>{email}</strong> Google account to access your containers.
-                        </p>
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; margin: 0; padding: 40px 20px; width: 100%; box-sizing: border-box;">
+                        <div style="max-width: 500px; margin: 0 auto; background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+                            <div style="text-align: center; margin-bottom: 24px;">
+                                <h1 style="color: #c9d1d9; font-size: 24px; font-weight: 600; margin: 0;">Welcome to Server Monitor</h1>
+                                <p style="color: #8b949e; font-size: 14px; margin-top: 8px;">You have been invited to manage your infrastructure.</p>
+                            </div>
+                            
+                            <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                                <p style="color: #c9d1d9; font-size: 14px; margin: 0 0 12px 0; line-height: 1.5;">
+                                    <strong>{actor['email']}</strong> has granted you access as a <strong>{role.capitalize()}</strong>.
+                                </p>
+                                
+                                <p style="color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin: 0 0 8px 0;">Resource Quota</p>
+                                <ul style="list-style: none; padding: 0; margin: 0; color: #c9d1d9; font-size: 14px; font-family: 'JetBrains Mono', Consolas, monospace;">
+                                    <li style="margin-bottom: 4px;">• <span style="color: #58a6ff;">RAM:</span>  {quota_ram} MB</li>
+                                    <li style="margin-bottom: 4px;">• <span style="color: #58a6ff;">CPU:</span>  {quota_cpu} Cores</li>
+                                    <li>• <span style="color: #58a6ff;">Disk:</span> {quota_disk} GB</li>
+                                </ul>
+                            </div>
+                            
+                            <div style="text-align: center;">
+                                <a href="http://localhost:4321/login" style="display: inline-block; background-color: #238636; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; transition: background-color 0.2s;">
+                                    Sign In via Google
+                                </a>
+                                <p style="margin-top: 16px; font-size: 12px; color: #8b949e;">
+                                    Please use your <strong>{email}</strong> Google account to authenticate.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                     """
                 }).encode('utf-8')
