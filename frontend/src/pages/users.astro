@@ -110,6 +110,42 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </div>
     </div>
   </div>
+
+  <!-- Edit user modal -->
+  <div class="modal-overlay" id="edit-user-modal">
+    <div class="modal">
+      <h2 class="modal-title">Edit User</h2>
+      <div id="edit-user-error" class="alert alert-error" style="display:none;margin-bottom:12px;"></div>
+      <form id="edit-user-form">
+        <input type="hidden" id="edit-user-id" />
+        <div class="form-group">
+          <label class="form-label" for="edit-user-role">Role</label>
+          <select id="edit-user-role" class="form-select">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px;">
+          <div class="form-group">
+            <label class="form-label" for="eq-ram">RAM (MB)</label>
+            <input type="number" id="eq-ram" class="form-input" min="64" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="eq-cpu">CPU Cores</label>
+            <input type="number" id="eq-cpu" class="form-input" min="1" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="eq-disk">Disk (GB)</label>
+            <input type="number" id="eq-disk" class="form-input" min="1" required />
+          </div>
+        </div>
+        <div class="modal-actions" style="margin-top:20px;">
+          <button type="button" class="btn btn-secondary" id="edit-user-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="edit-user-submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </BaseLayout>
 
 <style>
@@ -151,6 +187,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   let currentUserId = null;
   let containers = [];
   let selectedUserId = null;
+  let allUsersMap = {};
 
   async function init() {
     const res = await fetch('/api/users/me');
@@ -184,6 +221,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       if (!res.ok) return;
       const data = await res.json();
       const users = data.users || [];
+      allUsersMap = {};
+      users.forEach(u => { allUsersMap[u.id] = u; });
 
       if (users.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px;">No users yet.</td></tr>`;
@@ -226,6 +265,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             </td>
             <td>
               <div style="display:flex;gap:6px;">
+                ${u.active ? `<button class="btn btn-sm btn-secondary" onclick="openEditUser(${u.id})">Edit</button>` : ''}
                 ${u.active && u.id !== currentUserId
                   ? `<button class="btn btn-sm btn-danger" onclick="blockUser(${u.id}, '${u.email}')">Block</button>`
                   : ''}
@@ -303,6 +343,58 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     document.getElementById('assign-modal').classList.remove('open');
   });
 
+  // Edit user
+  function openEditUser(id) {
+    const u = allUsersMap[id];
+    if (!u) return;
+    document.getElementById('edit-user-id').value = id;
+    document.getElementById('edit-user-role').value = u.role;
+    document.getElementById('eq-ram').value = u.quota.ram_mb;
+    document.getElementById('eq-cpu').value = u.quota.cpu_cores;
+    document.getElementById('eq-disk').value = u.quota.disk_gb;
+    document.getElementById('edit-user-error').style.display = 'none';
+    document.getElementById('edit-user-modal').classList.add('open');
+  }
+
+  document.getElementById('edit-user-cancel')?.addEventListener('click', () => {
+    document.getElementById('edit-user-modal').classList.remove('open');
+  });
+
+  document.getElementById('edit-user-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-user-id').value;
+    const role = document.getElementById('edit-user-role').value;
+    const quota = {
+      ram_mb: parseInt(document.getElementById('eq-ram').value, 10),
+      cpu_cores: parseInt(document.getElementById('eq-cpu').value, 10),
+      disk_gb: parseInt(document.getElementById('eq-disk').value, 10),
+    };
+    
+    const submitBtn = document.getElementById('edit-user-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    
+    const res = await fetch(`/api/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role, quota })
+    });
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Save Changes';
+    
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const errEl = document.getElementById('edit-user-error');
+      errEl.textContent = err.description || err.title || 'Failed to update user';
+      errEl.style.display = 'flex';
+      return;
+    }
+    
+    document.getElementById('edit-user-modal').classList.remove('open');
+    await loadUsers();
+  });
+
   // Invite user
   document.getElementById('invite-btn')?.addEventListener('click', () => {
     document.getElementById('invite-modal').classList.add('open');
@@ -356,6 +448,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   window.unblockUser = unblockUser;
   window.revokeContainer = revokeContainer;
   window.openAssign = openAssign;
+  window.openEditUser = openEditUser;
 
   init();
 </script>
