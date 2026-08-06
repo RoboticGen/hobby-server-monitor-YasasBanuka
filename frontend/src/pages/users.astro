@@ -230,12 +230,24 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       }
 
       tbody.innerHTML = users.map(u => {
-        const chips = u.containers.map(c => `
+        // Calculate assigned resources
+        let assignedRam = 0, assignedCpu = 0, assignedDisk = 0;
+        const chips = u.containers.map(c => {
+          const cData = containers.find(x => x.name === c);
+          if (cData) {
+            assignedRam += cData.limits.ram_mb;
+            assignedCpu += cData.limits.cpu_cores;
+            assignedDisk += cData.limits.disk_gb;
+          }
+          return `
           <span class="chip">
             ${c}
             <button class="chip-remove" onclick="revokeContainer(${u.id}, '${c}')" title="Remove access">×</button>
           </span>
-        `).join('');
+        `}).join('');
+
+        const overQuota = assignedRam > u.quota.ram_mb || assignedCpu > u.quota.cpu_cores || assignedDisk > u.quota.disk_gb;
+        const quotaWarning = overQuota ? `<div style="color:var(--danger-color);font-size:11px;margin-top:4px;">⚠️ Over Quota (${assignedRam}MB / ${assignedCpu}c / ${assignedDisk}GB used)</div>` : '';
 
         const avatarStyle = u.picture_url
           ? `style="background-image:url(${u.picture_url});background-size:cover;"`
@@ -256,6 +268,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             <td><span class="badge ${u.active ? 'badge-running' : 'badge-stopped'}">${u.active ? 'Active' : 'Inactive'}</span></td>
             <td style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);">
               ${u.quota.ram_mb} MB / ${u.quota.cpu_cores} cores / ${u.quota.disk_gb} GB
+              ${quotaWarning}
             </td>
             <td>
               <div class="container-chips">

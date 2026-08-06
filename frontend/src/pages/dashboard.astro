@@ -290,7 +290,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   let lastMetricsMap = {};
   let containers = {};  // name → container data
   let lastContainers = [];
-  let hostCapacity = null;
   let lxdAvailable = true;
   let pollTimer = null;
 
@@ -414,7 +413,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       lastContainers = data.containers;
       // Build a map by name
       data.containers.forEach(c => { containers[c.name] = c; });
-      updateHostOverview(data.containers);
+      updateQuotaOverview(data.containers);
     } catch (e) {
       console.error('Failed to load containers:', e);
     }
@@ -434,67 +433,66 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         if (emptyStateText) emptyStateText.textContent = 'Create your first container to get started.';
         document.getElementById('create-btn')?.style.setProperty('display', 'inline-flex');
         document.getElementById('empty-create-btn')?.style.setProperty('display', 'inline-flex');
-        document.getElementById('host-overview-card')?.style.setProperty('display', 'block');
-        fetchHostCapacity();
       } else {
         if (emptyStateText) emptyStateText.textContent = 'You have no containers assigned to you. Please contact your administrator.';
       }
+
+      document.getElementById('quota-overview-card')?.style.setProperty('display', 'block');
+      updateQuotaOverview(Object.values(containers));
     } catch (e) {}
   }
 
-  async function fetchHostCapacity() {
-    try {
-      const res = await fetch('/api/host/capacity');
-      if (res.ok) {
-        hostCapacity = await res.json();
-        updateHostOverview(Object.values(containers));
-      }
-    } catch (e) {
-      console.error("Failed to fetch host capacity:", e);
-    }
-  }
-
-  function updateHostOverview(containers) {
-    if (!hostCapacity || currentUserRole !== 'admin') return;
+  function updateQuotaOverview(containersList) {
+    if (!currentUser || !currentUser.quota) return;
 
     let totalAllocatedRam = 0;
     let totalAllocatedCpu = 0;
     let totalAllocatedDisk = 0;
 
-    containers.forEach(c => {
+    containersList.forEach(c => {
       if (c.limits) {
-        totalAllocatedRam += (c.limits.ram_mb || 0);
-        totalAllocatedCpu += (c.limits.cpu_cores || 0);
-        totalAllocatedDisk += (c.limits.disk_gb || 0);
+        let ram = c.limits.memory || '0MB';
+        if (ram.endsWith('GB')) totalAllocatedRam += parseFloat(ram) * 1024;
+        else if (ram.endsWith('MB')) totalAllocatedRam += parseFloat(ram);
+        else totalAllocatedRam += parseFloat(ram) / 1024;
+
+        totalAllocatedCpu += parseInt(c.limits.cpu || '0');
+        
+        let disk = c.limits.disk || '0GB';
+        if (disk.endsWith('TB')) totalAllocatedDisk += parseFloat(disk) * 1024;
+        else if (disk.endsWith('GB')) totalAllocatedDisk += parseFloat(disk);
+        else if (disk.endsWith('MB')) totalAllocatedDisk += parseFloat(disk) / 1024;
       }
     });
 
-    const ramPct = Math.min(100, Math.round((totalAllocatedRam / hostCapacity.ram_mb) * 100)) || 0;
-    const cpuPct = Math.min(100, Math.round((totalAllocatedCpu / hostCapacity.cpu_cores) * 100)) || 0;
-    const diskPct = Math.min(100, Math.round((totalAllocatedDisk / hostCapacity.disk_gb) * 100)) || 0;
-
-    document.getElementById('host-ram-text').textContent = `${totalAllocatedRam} MB / ${hostCapacity.ram_mb} MB (${ramPct}%)`;
-    document.getElementById('host-cpu-text').textContent = `${totalAllocatedCpu} / ${hostCapacity.cpu_cores} Cores (${cpuPct}%)`;
-    document.getElementById('host-disk-text').textContent = `${totalAllocatedDisk} GB / ${hostCapacity.disk_gb} GB (${diskPct}%)`;
-
+    const cap = currentUser.quota;
+    
+    // RAM
+    const ramPct = cap.ram_mb > 0 ? (totalAllocatedRam / cap.ram_mb) * 100 : 0;
+    document.getElementById('host-ram-text').textContent = `${Math.round(totalAllocatedRam)} MB / ${cap.ram_mb} MB`;
     const ramBar = document.getElementById('host-ram-bar');
-    ramBar.style.width = `${ramPct}%`;
-    if (ramPct >= 100) ramBar.style.background = 'var(--accent-red)';
-    else if (ramPct >= 85) ramBar.style.background = 'var(--accent-yellow)';
-    else ramBar.style.background = 'var(--accent-blue-light)';
+    if (ramBar) {
+      ramBar.style.width = `${Math.min(100, ramPct)}%`;
+      ramBar.className = barColor(ramPct);
+    }
 
+    // CPU
+    const cpuPct = cap.cpu_cores > 0 ? (totalAllocatedCpu / cap.cpu_cores) * 100 : 0;
+    document.getElementById('host-cpu-text').textContent = `${totalAllocatedCpu} / ${cap.cpu_cores} Cores`;
     const cpuBar = document.getElementById('host-cpu-bar');
-    cpuBar.style.width = `${cpuPct}%`;
-    if (cpuPct >= 100) cpuBar.style.background = 'var(--accent-red)';
-    else if (cpuPct >= 85) cpuBar.style.background = 'var(--accent-yellow)';
-    else cpuBar.style.background = 'var(--accent-blue-light)';
+    if (cpuBar) {
+      cpuBar.style.width = `${Math.min(100, cpuPct)}%`;
+      cpuBar.className = barColor(cpuPct);
+    }
 
+    // Disk
+    const diskPct = cap.disk_gb > 0 ? (totalAllocatedDisk / cap.disk_gb) * 100 : 0;
+    document.getElementById('host-disk-text').textContent = `${Math.round(totalAllocatedDisk)} GB / ${cap.disk_gb} GB`;
     const diskBar = document.getElementById('host-disk-bar');
-    diskBar.style.width = `${diskPct}%`;
-    diskBar.style.opacity = '1';
-    if (diskPct >= 100) diskBar.style.background = 'var(--accent-red)';
-    else if (diskPct >= 85) diskBar.style.background = 'var(--accent-yellow)';
-    else diskBar.style.background = 'var(--accent-green)';
+    if (diskBar) {
+      diskBar.style.width = `${Math.min(100, diskPct)}%`;
+      diskBar.className = barColor(diskPct);
+    }
   }
 
   async function pollMetrics() {

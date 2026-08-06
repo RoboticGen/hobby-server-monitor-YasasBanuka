@@ -14,8 +14,8 @@ PyJWT==2.10.1
 # Uncomment on Linux/WSL:
 # pylxd==2.3.2
 
-# Time series database
-tinyflux==1.2.0
+# TSDB and Database
+sqlite3
 
 # Environment variable loading
 python-dotenv==1.0.1

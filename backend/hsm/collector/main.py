@@ -257,6 +257,23 @@ def _collect_loop() -> None:
 
         # Update live cache (for API)
         _update_live_cache(metrics)
+        
+        # Sync orphaned containers every cycle to keep DB clean
+        try:
+            from hsm.db import get_db
+            db = get_db()
+            lxd_names = [m["container"] for m in metrics]
+            
+            # Delete any containers from our DB that no longer exist in LXD
+            if lxd_names:
+                placeholders = ",".join(["?"] * len(lxd_names))
+                db.execute(f"DELETE FROM containers WHERE name NOT IN ({placeholders})", lxd_names)
+            else:
+                db.execute("DELETE FROM containers")
+                
+            db.commit()
+        except Exception as exc:
+            logger.warning("Failed to sync orphaned containers: %s", exc)
 
         # Check if compaction is needed
         _run_compaction()

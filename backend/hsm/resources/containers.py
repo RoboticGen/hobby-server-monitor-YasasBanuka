@@ -479,6 +479,13 @@ class ContainerExecResource:
 
         try:
             exit_code, stdout, stderr = instance.execute(cmd_list)
+            
+            # Audit log for accountability
+            _audit(req.context.user["id"], req.context.user["email"], "container.exec", name, {
+                "command": command_str,
+                "exit_code": exit_code
+            })
+            
         except Exception as exc:
             raise falcon.HTTPInternalServerError(
                 title="Command execution failed",

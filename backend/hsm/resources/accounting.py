@@ -64,9 +64,11 @@ class AccountingResource:
                 "containers": 0
             }
 
-        # 3. Get container owners from DB
-        containers_rows = db.execute("SELECT name, owner_id FROM containers").fetchall()
-        owner_map = {row["name"]: row["owner_id"] for row in containers_rows}
+        # 3. Get container assignments from DB
+        assignments_rows = db.execute("SELECT container_name, user_id FROM container_assignments").fetchall()
+        assigned_map = {}
+        for row in assignments_rows:
+            assigned_map.setdefault(row["container_name"], []).append(row["user_id"])
 
         # 4. Fetch all containers from LXD and sum allocations
         host_allocated = {"ram_mb": 0, "cpu_cores": 0, "disk_gb": 0}
@@ -98,12 +100,13 @@ class AccountingResource:
                 host_allocated["disk_gb"] += disk_gb
 
                 # Add to user total
-                owner_id = owner_map.get(inst.name)
-                if owner_id and owner_id in users_map:
-                    users_map[owner_id]["allocated"]["ram_mb"] += ram_mb
-                    users_map[owner_id]["allocated"]["cpu_cores"] += cpu_cores
-                    users_map[owner_id]["allocated"]["disk_gb"] += disk_gb
-                    users_map[owner_id]["containers"] += 1
+                users_assigned = assigned_map.get(inst.name, [])
+                for user_id in users_assigned:
+                    if user_id in users_map:
+                        users_map[user_id]["allocated"]["ram_mb"] += ram_mb
+                        users_map[user_id]["allocated"]["cpu_cores"] += cpu_cores
+                        users_map[user_id]["allocated"]["disk_gb"] += disk_gb
+                        users_map[user_id]["containers"] += 1
 
         except Exception as e:
             # If LXD is unreachable, we just return zeros for allocations
