@@ -79,6 +79,11 @@ def _collect_one(instance) -> dict | None:
 
     config = instance.config
 
+    def _get_val(obj, key, default=0):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
     # ── RAM ──────────────────────────────────────────────────────────────────
     ram_limit_mb = 0
     mem_str = config.get("limits.memory", "0MB")
@@ -87,10 +92,13 @@ def _collect_one(instance) -> dict | None:
     elif mem_str.endswith("GB"):
         ram_limit_mb = int(mem_str[:-2]) * 1024
 
-    ram_used_mb = int(getattr(getattr(state, "memory", None), "usage", 0) / 1024 / 1024)
+    mem_obj = _get_val(state, "memory", {})
+    ram_used = _get_val(mem_obj, "usage", 0)
+    ram_used_mb = int(ram_used / 1024 / 1024) if ram_used else 0
 
     # ── CPU ───────────────────────────────────────────────────────────────────
-    cpu_ns = getattr(getattr(state, "cpu", None), "usage", 0)
+    cpu_obj = _get_val(state, "cpu", {})
+    cpu_ns = _get_val(cpu_obj, "usage", 0)
 
     # ── Disk ──────────────────────────────────────────────────────────────────
     disk_limit_gb = 0
