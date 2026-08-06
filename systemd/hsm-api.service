@@ -14,7 +14,7 @@ EnvironmentFile=/etc/hsm/hsm.env
 
 WorkingDirectory=/opt/hsm/backend
 
-ExecStart=/opt/hsm/venv/bin/gunicorn hsm.wsgi:app \
+ExecStart=/opt/hsm/backend/venv/bin/gunicorn hsm.wsgi:app \
     --bind 0.0.0.0:8000 \
     --workers 1 \
     --timeout 120 \

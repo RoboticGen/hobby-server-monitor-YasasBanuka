@@ -13,7 +13,7 @@ EnvironmentFile=/etc/hsm/hsm.env
 
 WorkingDirectory=/opt/hsm/backend
 
-ExecStart=/opt/hsm/venv/bin/python -m hsm.collector.main
+ExecStart=/opt/hsm/backend/venv/bin/python -m hsm.collector.main
 
 Restart=always
 RestartSec=10
