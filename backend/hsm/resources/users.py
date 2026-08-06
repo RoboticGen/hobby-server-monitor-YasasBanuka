@@ -262,7 +262,7 @@ class UserResource:
 
     @require_role("admin")
     def on_delete(self, req: falcon.Request, resp: falcon.Response, user_id: str) -> None:
-        """Deactivate (revoke) a user. Does not delete the DB record (preserves audit history)."""
+        """Permanently delete a user from the database."""
         actor = req.context.user
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE id = ?", (int(user_id),)).fetchone()
@@ -271,22 +271,22 @@ class UserResource:
 
         if int(user_id) == 1:
             raise falcon.HTTPForbidden(
-                title="Cannot block primary owner",
-                description="User ID 1 is the primary owner and cannot be blocked."
+                title="Cannot delete primary owner",
+                description="User ID 1 is the primary owner and cannot be deleted."
             )
 
         if user["id"] == actor["id"]:
             raise falcon.HTTPBadRequest(
-                title="Cannot revoke yourself",
-                description="You cannot revoke your own account.",
+                title="Cannot delete yourself",
+                description="You cannot delete your own account.",
             )
 
-        db.execute("UPDATE users SET active = 0 WHERE id = ?", (int(user_id),))
+        db.execute("DELETE FROM users WHERE id = ?", (int(user_id),))
         db.commit()
 
         db.execute(
             "INSERT INTO audit_log (actor_id, actor_email, action, target, detail) VALUES (?, ?, ?, ?, ?)",
-            (actor["id"], actor["email"], "user.revoke", user["email"], None),
+            (actor["id"], actor["email"], "user.delete", user["email"], None),
         )
         db.commit()
 

@@ -266,14 +266,17 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             <td>
               <div style="display:flex;gap:6px;">
                 ${u.active ? `<button class="btn btn-sm btn-secondary" onclick="openEditUser(${u.id})">Edit</button>` : ''}
-                ${u.active && u.id !== currentUserId
-                  ? `<button class="btn btn-sm btn-danger" onclick="blockUser(${u.id}, '${u.email}')">Block</button>`
+                ${u.active && u.id !== currentUserId && u.id !== 1
+                  ? `<button class="btn btn-sm btn-secondary" onclick="blockUser(${u.id}, '${u.email}')">Block</button>`
                   : ''}
                 ${!u.active && u.name !== ''
                   ? `<button class="btn btn-sm btn-success" onclick="unblockUser(${u.id}, '${u.email}')">Unblock</button>`
                   : ''}
                 ${!u.active && u.name === ''
-                  ? `<span style="color:var(--text-muted);font-size:12px;">Pending</span>`
+                  ? `<span style="color:var(--text-muted);font-size:12px;margin-right:6px;">Pending</span>`
+                  : ''}
+                ${u.id !== 1 && u.id !== currentUserId
+                  ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id}, '${u.email}')">Delete</button>`
                   : ''}
               </div>
             </td>
@@ -286,9 +289,24 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
   }
 
+  async function deleteUser(id, email) {
+    if (!confirm(`Permanently delete ${email}? This action cannot be undone.`)) return;
+    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    if (!res.ok) { 
+      const err = await res.json().catch(() => ({}));
+      alert(`Error: ${err.description || err.title || 'Failed to delete user.'}`);
+      return; 
+    }
+    await loadUsers();
+  }
+
   async function blockUser(id, email) {
     if (!confirm(`Block access for ${email}? They will be immediately signed out.`)) return;
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: false })
+    });
     if (!res.ok) { 
       const err = await res.json().catch(() => ({}));
       alert(`Error: ${err.description || err.title || 'Failed to block user.'}`);
@@ -446,6 +464,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   window.blockUser = blockUser;
   window.unblockUser = unblockUser;
+  window.deleteUser = deleteUser;
   window.revokeContainer = revokeContainer;
   window.openAssign = openAssign;
   window.openEditUser = openEditUser;
