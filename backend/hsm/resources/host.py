@@ -62,13 +62,20 @@ class HostImagesResource:
             images = client.images.all()
             result = []
             for image in images:
-                aliases = [a.name for a in image.aliases]
+                raw_aliases = getattr(image, "aliases", []) or []
+                aliases = []
+                for a in raw_aliases:
+                    if isinstance(a, dict) and "name" in a:
+                        aliases.append(a["name"])
+                    elif hasattr(a, "name"):
+                        aliases.append(a.name)
+                
                 if aliases:
+                    props = getattr(image, "properties", {}) or {}
+                    desc = props.get("description", aliases[0]) if isinstance(props, dict) else aliases[0]
                     result.append({
                         "aliases": aliases,
-                        "description": getattr(image, "properties", {}).get(
-                            "description", aliases[0]
-                        ),
+                        "description": desc,
                     })
             resp.media = {"images": result}
         except Exception as exc:
