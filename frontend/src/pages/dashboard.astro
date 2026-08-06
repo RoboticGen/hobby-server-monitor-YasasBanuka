@@ -287,6 +287,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   let currentUser = null;
   let currentUserRole = null;
+  let lastMetricsMap = {};
   let containers = {};  // name → container data
   let lastContainers = [];
   let hostCapacity = null;
@@ -517,16 +518,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       // Merge live metrics with container config
       const metricsMap = {};
       (data.metrics || []).forEach(m => { metricsMap[m.container] = m; });
+      lastMetricsMap = metricsMap;
+      
+      renderTable();
+    } catch (e) {
+      console.error('Poll failed:', e);
+    }
+  }
 
-      // Also merge container data (from metrics for names)
-      (data.metrics || []).forEach(m => {
-        if (!containers[m.container]) {
-          containers[m.container] = { name: m.container, status: m.status, limits: {} };
-        }
-        containers[m.container].status = m.status || containers[m.container].status;
-      });
-
-      // Render table rows
+  function renderTable() {
       const tableWrapper = document.getElementById('container-table-wrapper');
       const tbody = document.getElementById('container-tbody');
       const emptyState = document.getElementById('empty-state');
@@ -541,7 +541,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         if (tbody) {
           tbody.innerHTML = names
             .sort()
-            .map(name => renderRow(containers[name], metricsMap[name]))
+            .map(name => renderRow(containers[name], lastMetricsMap[name]))
             .join('');
         }
       }
@@ -551,10 +551,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       if (updated) {
         updated.textContent = `${names.length} container${names.length !== 1 ? 's' : ''} · updated ${now.toLocaleTimeString()}`;
       }
-
-    } catch (e) {
-      console.error('Poll failed:', e);
-    }
   }
 
   async function triggerAction(name, action) {
@@ -591,7 +587,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           }
         } catch (e) { alert(`Error: ${e.message}`); }
         await loadContainers(); // Fetch immediate status change from API
-        await pollMetrics();    // Re-render table
+        renderTable();          // Re-render table
         cleanup();
         resolve();
       };
@@ -613,8 +609,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     await loadCurrentUser();
     await loadContainers();
     await pollMetrics();
-    // Poll every 15 seconds
-    pollTimer = setInterval(pollMetrics, 15000);
+
+    // Poll periodically
+    setInterval(async () => {
+      await loadContainers();
+      await pollMetrics();
+    }, 10000);
   })();
 
   // Cleanup on page unload
