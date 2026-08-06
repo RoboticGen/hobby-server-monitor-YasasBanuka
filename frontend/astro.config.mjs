@@ -26,7 +26,7 @@ export default defineConfig({
       },
     },
     preview: {
-      allowedHosts: true,
+      allowedHosts: ['13.223.242.47.nip.io', 'localhost'],
     },
   },
 
