@@ -226,6 +226,10 @@ class _MockInstance:
         self._data["uptime_seconds"] = 0
 
     def stop(self, wait: bool = True, force: bool = False) -> None:
+        if self._data.get("ephemeral"):
+            _MOCK_CONTAINERS.pop(self.name, None)
+            return
+
         self._data["status"] = "Stopped"
         self._data["status_code"] = 102
         self._data["cpu_usage"] = 0.0
