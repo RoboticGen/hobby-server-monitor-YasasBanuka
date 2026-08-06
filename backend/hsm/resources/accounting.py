@@ -73,7 +73,7 @@ class AccountingResource:
         
         try:
             client = get_client()
-            instances = client.containers.all()
+            instances = client.instances.all()
             for inst in instances:
                 config = inst.config
                 devices = inst.devices
