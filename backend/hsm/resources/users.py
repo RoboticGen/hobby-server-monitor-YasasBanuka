@@ -174,7 +174,8 @@ class UserCollectionResource:
                     data=email_data,
                     headers={
                         "Authorization": f"Bearer {resend_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "User-Agent": "Resend-Python-Client/1.0"
                     },
                     method="POST"
                 )
