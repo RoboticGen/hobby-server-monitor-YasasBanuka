@@ -240,6 +240,35 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   .stat-item:last-child { border-bottom: none; }
   .stat-item-label { font-size: 12px; color: var(--text-muted); font-weight: 500; flex-shrink: 0; }
   .stat-item-value { font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: right; }
+
+  /* Modal Styles */
+  .modal {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: auto;
+  }
+  .modal::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  .modal-content {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    color: var(--text-primary);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  .modal-title {
+    font-size: 16px; font-weight: 600; margin: 0 0 8px 0; color: var(--text-primary);
+  }
+  .modal-desc {
+    font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0;
+  }
+  .modal-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+  }
 </style>
 
 <script>
