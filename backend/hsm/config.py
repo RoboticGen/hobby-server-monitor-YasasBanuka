@@ -60,7 +60,9 @@ class Config:
     LXD_MODE: str = os.environ.get("LXD_MODE", "real")  # "real" | "mock"
 
     # Timeout (seconds) for LXD API calls. Prevents hanging on an unresponsive daemon.
-    LXD_TIMEOUT: int = int(os.environ.get("LXD_TIMEOUT", "10"))
+    # Production values should be high (e.g. 120) because extracting a large OS image
+    # for the first container can take up to 60 seconds on burstable cloud VMs.
+    LXD_TIMEOUT: int = int(os.environ.get("LXD_TIMEOUT", "120"))
 
     # ── Server ───────────────────────────────────────────────────────────────
     # Bind address for the Falcon/gunicorn server.
