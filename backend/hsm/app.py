@@ -142,14 +142,40 @@ def create_app() -> App:
 
     # ── Static frontend files ────────────────────────────────────────────────
     # Astro builds to frontend/dist/. In production, serve these from Falcon.
-    # In development, the Astro dev server (port 4321) proxies to this backend.
     import os
+    import mimetypes
     static_path = os.environ.get("STATIC_DIR", "../frontend/dist")
-    
-    # Falcon requires an absolute path for static routes
     abs_static_path = os.path.abspath(static_path)
+    
     if os.path.isdir(abs_static_path):
-        app.add_static_route("/", abs_static_path)
+        class AstroStaticSink:
+            def __call__(self, req, resp):
+                if req.path.startswith("/api/"):
+                    raise falcon.HTTPNotFound()
+                if ".." in req.path:
+                    raise falcon.HTTPForbidden()
+
+                path = req.path.lstrip("/")
+                if not path:
+                    path = "index.html"
+
+                full_path = os.path.join(abs_static_path, path)
+
+                if os.path.isdir(full_path):
+                    full_path = os.path.join(full_path, "index.html")
+
+                if not os.path.exists(full_path) and not full_path.endswith(".html"):
+                    full_path += ".html"
+
+                if not os.path.exists(full_path):
+                    raise falcon.HTTPNotFound()
+
+                resp.content_type = mimetypes.guess_type(full_path)[0] or "application/octet-stream"
+                with open(full_path, "rb") as f:
+                    resp.data = f.read()
+
+        # Add sink as a catch-all for anything not caught by API routes
+        app.add_sink(AstroStaticSink(), prefix="/")
 
     # Error serialization: always return JSON, not HTML
     app.add_error_handler(Exception, _json_error_handler)
