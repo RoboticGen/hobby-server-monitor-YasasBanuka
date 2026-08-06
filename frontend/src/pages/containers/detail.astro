@@ -322,17 +322,26 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       document.getElementById('btn-edit-config').style.display = 'block';
 
       const btns = document.getElementById('action-buttons');
-      const isRunning = container.status === 'Running';
-      const isStopped = container.status === 'Stopped';
+      const status = container.status;
+      let html = '';
 
-      btns.innerHTML = `
-        ${isStopped ? `<button class="btn btn-primary" onclick="doAction('start')">▶ Start</button>` : ''}
-        ${isRunning ? `
+      if (status === 'Stopped') {
+        html += `<button class="btn btn-primary" onclick="doAction('start')">▶ Start</button>`;
+      } else if (status === 'Running') {
+        html += `
           <button class="btn btn-secondary" onclick="doAction('restart')">↺ Restart</button>
+          <button class="btn btn-secondary" onclick="doAction('freeze')">❄ Freeze</button>
           <button class="btn btn-danger" onclick="doAction('stop')">■ Stop</button>
-        ` : ''}
-        <button class="btn" style="margin-left: 8px; color: var(--accent-red); border: 1px solid var(--accent-red); background: transparent;" onclick="doDelete()">🗑 Delete</button>
-      `;
+        `;
+      } else if (status === 'Frozen') {
+        html += `
+          <button class="btn btn-secondary" onclick="doAction('unfreeze')">▶ Unfreeze</button>
+          <button class="btn btn-danger" onclick="doAction('stop')">■ Stop</button>
+        `;
+      }
+      
+      html += `<button class="btn" style="margin-left: 8px; color: var(--accent-red); border: 1px solid var(--accent-red); background: transparent;" onclick="doDelete()">🗑 Delete</button>`;
+      btns.innerHTML = html;
     } catch (e) {}
   }
 

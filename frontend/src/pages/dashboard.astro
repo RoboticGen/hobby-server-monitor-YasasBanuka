@@ -340,6 +340,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <div class="table-actions" id="actions-${name}">
             <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'stop')">Stop</button>
             <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'restart')">Restart</button>
+            <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'freeze')">Freeze</button>
+          </div>`;
+      } else if (status === 'Frozen') {
+        actionBtns = `
+          <div class="table-actions" id="actions-${name}">
+            <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'unfreeze')">Unfreeze</button>
+            <button class="btn btn-sm btn-secondary" onclick="event.preventDefault(); triggerAction('${name}', 'stop')">Stop</button>
           </div>`;
       } else {
         actionBtns = `
