@@ -1,0 +1,349 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Usage Accounting">
+  <div class="page-header">
+    <h1>Usage Accounting</h1>
+    <p style="color:var(--text-muted);">Global host capacity, user quotas, and historical container usage.</p>
+  </div>
+
+  <div id="accounting-error" class="alert alert-error" style="display:none;margin-bottom:20px;"></div>
+
+  <!-- Host Overview -->
+  <div class="card" style="margin-bottom:30px;">
+    <h2 class="card-title">Host Capacity Overview</h2>
+    <div id="host-stats" class="host-grid">
+      <div class="stat-box">Loading...</div>
+    </div>
+  </div>
+
+  <!-- User Quotas -->
+  <div class="card" style="margin-bottom:30px;">
+    <h2 class="card-title">User Quotas & Allocations</h2>
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Containers</th>
+            <th>RAM Allocated</th>
+            <th>CPU Allocated</th>
+            <th>Disk Allocated</th>
+          </tr>
+        </thead>
+        <tbody id="user-stats-body">
+          <tr><td colspan="6" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TSDB Container History -->
+  <div class="card" style="margin-bottom:30px;">
+    <h2 class="card-title">Container History (TSDB)</h2>
+    <div style="display:flex;gap:12px;margin-bottom:20px;align-items:flex-end;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="history-container">Container</label>
+        <select id="history-container" class="form-select" style="min-width:200px;">
+          <option value="">Select a container...</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="history-range">Time Range</label>
+        <select id="history-range" class="form-select">
+          <option value="1h">Last Hour</option>
+          <option value="24h" selected>Last 24 Hours</option>
+          <option value="7d">Last 7 Days</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="load-history-btn">Load History</button>
+    </div>
+    
+    <div id="history-charts-container" style="display:none;">
+      <div class="chart-wrapper">
+        <h3>CPU Usage (%)</h3>
+        <div id="history-cpu-chart" class="chart-box"></div>
+      </div>
+      <div class="chart-wrapper" style="margin-top:20px;">
+        <h3>RAM Usage (MB)</h3>
+        <div id="history-ram-chart" class="chart-box"></div>
+      </div>
+    </div>
+    <div id="history-empty" style="padding:40px;text-align:center;color:var(--text-muted);">
+      Select a container and time range to view historical metrics.
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .host-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+  }
+  .stat-box {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .stat-title {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-val {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  
+  .progress-container {
+    width: 100%;
+    height: 8px;
+    background: #30363d;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent-blue);
+    transition: width 0.3s ease;
+  }
+  .progress-bar.warning { background: #d29922; }
+  .progress-bar.danger { background: var(--accent-red); }
+  
+  .progress-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .chart-wrapper h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: var(--text-primary);
+  }
+  .chart-box {
+    width: 100%;
+    height: 250px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+</style>
+
+<!-- Load uPlot -->
+<link rel="stylesheet" href="https://unpkg.com/uplot@1.6.30/dist/uPlot.min.css">
+<script src="https://unpkg.com/uplot@1.6.30/dist/uPlot.iife.min.js" is:inline></script>
+
+<script type="module">
+  let cpuChart = null;
+  let ramChart = null;
+
+  async function loadAccounting() {
+    try {
+      const res = await fetch('/api/accounting');
+      if (!res.ok) {
+        if (res.status === 403) {
+          document.getElementById('accounting-error').textContent = "Access denied. Admins only.";
+          document.getElementById('accounting-error').style.display = 'block';
+          return;
+        }
+        throw new Error("Failed to load accounting data");
+      }
+      const data = await res.json();
+      renderHost(data.host);
+      renderUsers(data.users);
+    } catch (err) {
+      document.getElementById('accounting-error').textContent = err.message;
+      document.getElementById('accounting-error').style.display = 'block';
+    }
+  }
+
+  function renderHost(host) {
+    const { capacity, allocated } = host;
+    
+    function makeStat(title, alloc, cap, unit) {
+      const pct = cap > 0 ? (alloc / cap) * 100 : 0;
+      let colorClass = '';
+      if (pct > 100) colorClass = 'danger';
+      else if (pct > 80) colorClass = 'warning';
+      
+      const width = Math.min(pct, 100);
+      
+      return `
+        <div class="stat-box">
+          <div class="stat-title">${title}</div>
+          <div class="stat-val">${alloc} <span style="font-size:14px;color:var(--text-muted)">/ ${cap} ${unit}</span></div>
+          <div class="progress-container">
+            <div class="progress-bar ${colorClass}" style="width: ${width}%"></div>
+          </div>
+          <div class="progress-text">
+            <span>Allocated</span>
+            <span class="${pct > 100 ? 'text-danger' : ''}">${pct.toFixed(1)}%</span>
+          </div>
+        </div>
+      `;
+    }
+
+    document.getElementById('host-stats').innerHTML = `
+      ${makeStat('Memory (RAM)', allocated.ram_mb, capacity.ram_mb, 'MB')}
+      ${makeStat('CPU Cores', allocated.cpu_cores, capacity.cpu_cores, 'Cores')}
+      ${makeStat('Disk Space', allocated.disk_gb, capacity.disk_gb, 'GB')}
+    `;
+  }
+
+  function renderUsers(users) {
+    const tbody = document.getElementById('user-stats-body');
+    if (users.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No users found.</td></tr>`;
+      return;
+    }
+
+    function renderQuotaBar(alloc, quota, unit) {
+      const pct = quota > 0 ? (alloc / quota) * 100 : 0;
+      let colorClass = '';
+      if (pct > 100) colorClass = 'danger';
+      else if (pct > 80) colorClass = 'warning';
+      
+      const width = Math.min(pct, 100);
+      
+      return `
+        <div style="margin-bottom:4px;font-size:13px;">${alloc} / ${quota} ${unit}</div>
+        <div class="progress-container" style="height:6px;background:var(--bg-primary);">
+          <div class="progress-bar ${colorClass}" style="width: ${width}%"></div>
+        </div>
+      `;
+    }
+
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>
+          <div style="font-weight:600;">${u.email}</div>
+          <div style="font-size:12px;color:var(--text-muted);">${u.name}</div>
+        </td>
+        <td><span class="badge badge-${u.role === 'admin' ? 'danger' : 'primary'}">${u.role}</span></td>
+        <td>${u.containers}</td>
+        <td>${renderQuotaBar(u.allocated.ram_mb, u.quota.ram_mb, 'MB')}</td>
+        <td>${renderQuotaBar(u.allocated.cpu_cores, u.quota.cpu_cores, 'Cores')}</td>
+        <td>${renderQuotaBar(u.allocated.disk_gb, u.quota.disk_gb, 'GB')}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadContainersDropdown() {
+    try {
+      const res = await fetch('/api/containers');
+      if (!res.ok) return;
+      const data = await res.json();
+      const select = document.getElementById('history-container');
+      
+      const existingVal = select.value;
+      select.innerHTML = '<option value="">Select a container...</option>' + 
+        (data.containers || []).map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      if (existingVal) select.value = existingVal;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function renderHistoryCharts() {
+    const name = document.getElementById('history-container').value;
+    const range = document.getElementById('history-range').value;
+    
+    if (!name) {
+      document.getElementById('history-charts-container').style.display = 'none';
+      document.getElementById('history-empty').style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('load-history-btn');
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+
+    try {
+      const res = await fetch(`/api/metrics/${name}/history?range=${range}&points=288`);
+      if (!res.ok) throw new Error("Failed to load TSDB history");
+      const data = await res.json();
+      
+      document.getElementById('history-charts-container').style.display = 'block';
+      document.getElementById('history-empty').style.display = 'none';
+      
+      drawUPlot(data.data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Load History';
+    }
+  }
+
+  function drawUPlot(history) {
+    if (typeof uPlot === 'undefined') return;
+
+    if (cpuChart) { cpuChart.destroy(); cpuChart = null; }
+    if (ramChart) { ramChart.destroy(); ramChart = null; }
+
+    const cpuBox = document.getElementById('history-cpu-chart');
+    const ramBox = document.getElementById('history-ram-chart');
+    cpuBox.innerHTML = '';
+    ramBox.innerHTML = '';
+
+    if (!history || history.length === 0) {
+      cpuBox.textContent = 'No data available for this range.';
+      ramBox.textContent = 'No data available for this range.';
+      return;
+    }
+
+    const times = history.map(d => new Date(d.time).getTime() / 1000);
+    const cpuVals = history.map(d => d.cpu_percent);
+    const ramVals = history.map(d => d.mem_used_mb);
+
+    const optsBase = {
+      width: cpuBox.clientWidth - 20,
+      height: 230,
+      cursor: { points: { size: 5, fill: "white" } },
+      axes: [
+        { stroke: "#8b949e", grid: { stroke: "#30363d" } },
+        { stroke: "#8b949e", grid: { stroke: "#30363d" } }
+      ]
+    };
+
+    const cpuOpts = {
+      ...optsBase,
+      series: [
+        {},
+        { label: "CPU %", stroke: "#58a6ff", fill: "rgba(88, 166, 255, 0.1)", width: 2 }
+      ]
+    };
+
+    const ramOpts = {
+      ...optsBase,
+      series: [
+        {},
+        { label: "RAM (MB)", stroke: "#3fb950", fill: "rgba(63, 185, 80, 0.1)", width: 2 }
+      ]
+    };
+
+    cpuChart = new uPlot(cpuOpts, [times, cpuVals], cpuBox);
+    ramChart = new uPlot(ramOpts, [times, ramVals], ramBox);
+  }
+
+  document.getElementById('load-history-btn')?.addEventListener('click', renderHistoryCharts);
+
+  // Initial load
+  loadAccounting();
+  loadContainersDropdown();
+</script>

@@ -21,6 +21,7 @@ from hsm.resources.containers import (
     ContainerResource,
     ContainerExecResource,
 )
+from hsm.resources.accounting import AccountingResource
 from hsm.resources.metrics import LiveMetricsResource, ContainerMetricHistoryResource
 from hsm.resources.users import (
     CurrentUserResource,
@@ -119,6 +120,9 @@ def create_app() -> App:
     # ── Metrics ───────────────────────────────────────────────────────────────
     app.add_route("/api/metrics/live", LiveMetricsResource())
     app.add_route("/api/metrics/{name}/history", ContainerMetricHistoryResource())
+
+    # Accounting
+    app.add_route("/api/accounting", AccountingResource())
 
     # ── Users ────────────────────────────────────────────────────────────────
     app.add_route("/api/users/me", CurrentUserResource())
