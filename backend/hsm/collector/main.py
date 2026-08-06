@@ -90,7 +90,7 @@ def _collect_one(instance) -> dict | None:
     ram_used_mb = int(getattr(getattr(state, "memory", None), "usage", 0) / 1024 / 1024)
 
     # ── CPU ───────────────────────────────────────────────────────────────────
-    cpu_usage_pct = getattr(getattr(state, "cpu", None), "usage", 0)
+    cpu_ns = getattr(getattr(state, "cpu", None), "usage", 0)
 
     # ── Disk ──────────────────────────────────────────────────────────────────
     disk_limit_gb = 0
@@ -126,7 +126,7 @@ def _collect_one(instance) -> dict | None:
         net_rx_bytes += counters.get("bytes_received", 0)
         net_tx_bytes += counters.get("bytes_sent", 0)
 
-    # Compute network rates (bytes per second)
+    # Compute network and CPU rates
     now = time.monotonic()
     prev = _prev_net.get(instance.name, {})
     interval = now - prev.get("time", now - Config.COLLECTOR_INTERVAL_SECONDS)
@@ -134,11 +134,15 @@ def _collect_one(instance) -> dict | None:
     if prev and interval > 0:
         rx_rate = max(0, (net_rx_bytes - prev.get("rx", 0)) / interval)
         tx_rate = max(0, (net_tx_bytes - prev.get("tx", 0)) / interval)
+        
+        # CPU usage rate = (nanoseconds difference) / interval / 1e9
+        cpu_usage_pct = max(0.0, ((cpu_ns - prev.get("cpu", 0)) / interval) / 1e9 * 100.0)
     else:
         rx_rate = 0.0
         tx_rate = 0.0
+        cpu_usage_pct = 0.0
 
-    _prev_net[instance.name] = {"time": now, "rx": net_rx_bytes, "tx": net_tx_bytes}
+    _prev_net[instance.name] = {"time": now, "rx": net_rx_bytes, "tx": net_tx_bytes, "cpu": cpu_ns}
 
     # ── Process count ─────────────────────────────────────────────────────────
     process_count = getattr(state, "processes", 0)
