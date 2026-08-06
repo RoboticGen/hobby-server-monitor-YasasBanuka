@@ -162,7 +162,10 @@ def _collect_one(instance) -> dict | None:
         "net_rx_rate_bps": float(rx_rate),
         "net_tx_rate_bps": float(tx_rate),
         "process_count": float(process_count),
-        "uptime_seconds": float(time.time()),  # Approximate; use created_at for real uptime
+        # LXD does not expose an efficient 'started_at' timestamp via state().
+        # Executing 'cat /proc/uptime' in every container every 10s is too heavy.
+        # Returning 0.0 forces the frontend to display '--' instead of 56 years.
+        "uptime_seconds": 0.0,
     }
 
 
