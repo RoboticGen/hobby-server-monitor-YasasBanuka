@@ -17,6 +17,9 @@ Invite flow:
   This means the user MUST be invited before they can sign in.
 """
 import json
+import urllib.request
+import urllib.error
+import os
 
 import falcon
 
@@ -136,6 +139,49 @@ class UserCollectionResource:
         db.commit()
 
         new_user = db.execute("SELECT * FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        
+        # Send Invite Email via Resend if configured
+        resend_key = os.environ.get("RESEND_API_KEY")
+        resend_from = os.environ.get("RESEND_FROM_EMAIL", "admin@yasasbanuka.com")
+        if resend_key:
+            try:
+                email_data = json.dumps({
+                    "from": resend_from,
+                    "to": [email],
+                    "subject": "You've been invited to the Server Monitor Dashboard",
+                    "html": f"""
+                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                        <h2>Welcome!</h2>
+                        <p><strong>{actor['email']}</strong> has invited you to access the Hobby Server Monitor.</p>
+                        <p>You have been granted a <strong>{role}</strong> role with a resource quota of:</p>
+                        <ul>
+                            <li><strong>RAM:</strong> {quota_ram} MB</li>
+                            <li><strong>CPU:</strong> {quota_cpu} Cores</li>
+                            <li><strong>Disk:</strong> {quota_disk} GB</li>
+                        </ul>
+                        <p style="margin-top: 30px;">
+                            <a href="http://localhost:4321/login" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Sign In via Google</a>
+                        </p>
+                        <p style="margin-top: 30px; font-size: 12px; color: #777;">
+                            Make sure to sign in with your <strong>{email}</strong> Google account to access your containers.
+                        </p>
+                    </div>
+                    """
+                }).encode('utf-8')
+                
+                req_obj = urllib.request.Request(
+                    "https://api.resend.com/emails",
+                    data=email_data,
+                    headers={
+                        "Authorization": f"Bearer {resend_key}",
+                        "Content-Type": "application/json"
+                    },
+                    method="POST"
+                )
+                urllib.request.urlopen(req_obj, timeout=5)
+            except Exception as e:
+                print(f"Warning: Failed to send Resend invitation email to {email}: {e}")
+
         resp.status = falcon.HTTP_201
         resp.media = _serialize_user(new_user)
 
