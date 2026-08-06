@@ -171,7 +171,7 @@ class UserCollectionResource:
                             </div>
                             
                             <div style="text-align: center;">
-                                <a href="http://localhost:4321/login" style="display: inline-block; background-color: #238636; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; transition: background-color 0.2s;">
+                                <a href="{req.prefix}/login" style="display: inline-block; background-color: #238636; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; transition: background-color 0.2s;">
                                     Sign In via Google
                                 </a>
                                 <p style="margin-top: 16px; font-size: 12px; color: #8b949e;">
