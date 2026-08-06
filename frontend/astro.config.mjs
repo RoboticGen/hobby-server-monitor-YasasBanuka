@@ -13,6 +13,7 @@ export default defineConfig({
   // This avoids CORS issues in development.
   vite: {
     server: {
+      allowedHosts: true,
       proxy: {
         '/api': {
           target: 'http://localhost:8000',
@@ -23,6 +24,9 @@ export default defineConfig({
           changeOrigin: true,
         },
       },
+    },
+    preview: {
+      allowedHosts: true,
     },
   },
 
