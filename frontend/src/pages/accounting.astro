@@ -142,6 +142,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     justify-content: center;
     overflow: hidden;
   }
+  
+  /* Make uPlot legend look clean */
+  :global(.u-legend) {
+    display: flex !important;
+    justify-content: center;
+    gap: 15px;
+    padding-top: 10px;
+    font-size: 13px;
+    color: var(--text-muted) !important;
+  }
+  :global(.u-legend .u-series) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  :global(.u-legend th), :global(.u-legend td) {
+    padding: 0 !important;
+    color: var(--text-primary);
+  }
 </style>
 
 <!-- Load uPlot -->
@@ -315,7 +334,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       width: cpuBox.clientWidth - 20,
       height: 230,
       cursor: { points: { size: 5, fill: "white" } },
-      legend: { show: false },
       axes: [
         { stroke: "#8b949e", grid: { stroke: "#30363d" } },
         { stroke: "#8b949e", grid: { stroke: "#30363d" } }
