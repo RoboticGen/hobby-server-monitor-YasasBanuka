@@ -59,7 +59,7 @@ logger = logging.getLogger("hsm.collector")
 LIVE_CACHE_PATH = os.environ.get("LIVE_CACHE_PATH", "data/live_cache.json")
 
 # Track the last time we ran compaction (to avoid running it more than once/day)
-_last_compaction_date: Optional[str] = None
+_last_compaction_date: str | None = None
 
 # Track previous network counters for rate calculation
 _prev_net: dict[str, dict] = {}
