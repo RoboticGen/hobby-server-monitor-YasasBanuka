@@ -226,14 +226,9 @@ class ContainerCollectionResource:
             (user["id"],),
         ).fetchone()
         
-        if user["role"] == "admin":
-            user_quota = {
-                "quota_ram_mb": 999999, "quota_cpu_cores": 9999, "quota_disk_gb": 99999
-            }
-        else:
-            user_quota = dict(user_row) if user_row else {
-                "quota_ram_mb": 0, "quota_cpu_cores": 0, "quota_disk_gb": 0
-            }
+        user_quota = dict(user_row) if user_row else {
+            "quota_ram_mb": 0, "quota_cpu_cores": 0, "quota_disk_gb": 0
+        }
         
         user_allocation = _get_user_allocation(user["id"])
 
@@ -306,11 +301,11 @@ class ContainerResource:
         meta = db.execute("SELECT * FROM containers WHERE name = ?", (name,)).fetchone()
         resp.media = _serialize_instance(instance, dict(meta) if meta else None)
 
-    @require_role("admin")
     def on_patch(self, req: falcon.Request, resp: falcon.Response, name: str) -> None:
         """Update container config or trigger a lifecycle action."""
         user = req.context.user
         name = validate_container_name(name)
+        check_container_access(req, name)
         
         body = req.media or {}
 
@@ -349,14 +344,7 @@ class ContainerResource:
             return
 
         # Resource limit update
-        # ONLY admins are allowed to change RAM/CPU limits
-        if "ram_mb" in body or "cpu_cores" in body or "autostart" in body:
-            if user["role"] != "admin":
-                raise falcon.HTTPForbidden(
-                    title="Access denied",
-                    description="Only administrators can modify container resource limits.",
-                )
-                
+        if "ram_mb" in body or "cpu_cores" in body or "autostart" in body or "cpu_allowance_pct" in body:
             config_updates = {}
             detail = {}
             
@@ -367,12 +355,37 @@ class ContainerResource:
                 "cpu_cores": os.cpu_count() or 4,
             }
 
+            db = get_db()
+            user_row = db.execute(
+                "SELECT quota_ram_mb, quota_cpu_cores FROM users WHERE id = ?",
+                (user["id"],)
+            ).fetchone()
+            user_quota = dict(user_row) if user_row else {"quota_ram_mb": 0, "quota_cpu_cores": 0}
+            
+            # Find the user's total allocation, but subtract THIS container's current allocation
+            user_allocation = _get_user_allocation(user["id"])
+            current_ram_str = instance.config.get("limits.memory", "0MB")
+            try:
+                current_ram_mb = int(current_ram_str[:-2]) if current_ram_str.endswith("MB") else (int(current_ram_str[:-2]) * 1024 if current_ram_str.endswith("GB") else 0)
+            except Exception:
+                current_ram_mb = 0
+                
+            try:
+                current_cpu_cores = int(instance.config.get("limits.cpu", "0"))
+            except Exception:
+                current_cpu_cores = 0
+            
+            quota_ram_remaining = user_quota["quota_ram_mb"] - max(0, user_allocation["ram_mb"] - current_ram_mb)
+            quota_cpu_remaining = user_quota["quota_cpu_cores"] - max(0, user_allocation["cpu_cores"] - current_cpu_cores)
+
             if "ram_mb" in body:
                 ram_mb = int(body["ram_mb"])
                 if ram_mb < 64:
                     raise falcon.HTTPBadRequest(title="Validation Error", description="ram_mb must be at least 64.")
                 if ram_mb > host_capacity["ram_mb"]:
                     raise falcon.HTTPBadRequest(title="Validation Error", description=f"ram_mb exceeds host capacity ({host_capacity['ram_mb']} MB).")
+                if ram_mb > quota_ram_remaining:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description=f"ram_mb ({ram_mb}) exceeds your remaining quota ({quota_ram_remaining} MB).")
                 config_updates["limits.memory"] = f"{ram_mb}MB"
                 detail["ram_mb"] = ram_mb
                 
@@ -382,8 +395,20 @@ class ContainerResource:
                     raise falcon.HTTPBadRequest(title="Validation Error", description="cpu_cores must be at least 1.")
                 if cpu_cores > host_capacity["cpu_cores"]:
                     raise falcon.HTTPBadRequest(title="Validation Error", description=f"cpu_cores exceeds host capacity ({host_capacity['cpu_cores']} cores).")
+                if cpu_cores > quota_cpu_remaining:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description=f"cpu_cores ({cpu_cores}) exceeds your remaining quota ({quota_cpu_remaining} Cores).")
                 config_updates["limits.cpu"] = str(cpu_cores)
                 detail["cpu_cores"] = cpu_cores
+                
+            if "cpu_allowance_pct" in body:
+                try:
+                    cpu_allowance_pct = int(body["cpu_allowance_pct"])
+                except Exception:
+                    cpu_allowance_pct = 100
+                if cpu_allowance_pct < 10 or cpu_allowance_pct > 100:
+                    raise falcon.HTTPBadRequest(title="Validation Error", description="cpu_allowance_pct must be between 10 and 100.")
+                config_updates["limits.cpu.allowance"] = f"{cpu_allowance_pct}%"
+                detail["cpu_allowance_pct"] = cpu_allowance_pct
                 
             if "autostart" in body:
                 autostart = bool(body["autostart"])

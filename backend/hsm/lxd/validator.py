@@ -213,7 +213,14 @@ def validate_create_config(
     # ── CPU allowance (%) ─────────────────────────────────────────────────────
     # LXD supports a CPU allowance in addition to core count, e.g. "50%" means
     # the container may use up to 50% of each allocated core.
-    cpu_allowance_pct = max(10, min(100, int(body.get("cpu_allowance_pct", 100))))
+    try:
+        cpu_allowance_pct = int(body.get("cpu_allowance_pct", 100))
+    except (TypeError, ValueError):
+        errors.append("'cpu_allowance_pct' must be an integer.")
+        cpu_allowance_pct = 100
+        
+    if cpu_allowance_pct < 10 or cpu_allowance_pct > 100:
+        errors.append("'cpu_allowance_pct' must be between 10 and 100.")
 
     # ── Security checks ───────────────────────────────────────────────────────
     # Check user-provided config keys (if any) for blocked keys
