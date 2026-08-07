@@ -34,6 +34,7 @@ def get_tsdb() -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA cache_size=-10000")  # 10 MB cache
         
         # Initialize schema if it doesn't exist
         conn.executescript("""
@@ -80,9 +81,10 @@ def get_tsdb() -> sqlite3.Connection:
     return _local.conn
 
 
-def write_metric(container_name: str, fields: Dict[str, float]) -> None:
+def write_metric(container_name: str, fields: Dict[str, float], commit: bool = True) -> None:
     """
     Write a single metric sample for the given container.
+    If commit is False, the caller is responsible for calling get_tsdb().commit().
     """
     db = get_tsdb()
     
@@ -103,7 +105,8 @@ def write_metric(container_name: str, fields: Dict[str, float]) -> None:
         f"INSERT INTO container_metrics ({col_str}) VALUES ({placeholders})",
         values
     )
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def get_latest_metrics(container_name: str) -> Optional[Dict[str, Any]]:

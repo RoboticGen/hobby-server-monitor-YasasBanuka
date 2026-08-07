@@ -75,7 +75,7 @@ class Config:
     # ── Metrics Collector ─────────────────────────────────────────────────────
     # How often (seconds) the collector polls LXD for metrics.
     COLLECTOR_INTERVAL_SECONDS: int = int(
-        os.environ.get("COLLECTOR_INTERVAL_SECONDS", "10")
+        os.environ.get("COLLECTOR_INTERVAL_SECONDS", "15")
     )
 
     # Raw metric retention period in days. Points older than this are compacted.

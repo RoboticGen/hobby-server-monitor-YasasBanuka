@@ -215,8 +215,11 @@ def _run_compaction() -> None:
         logger.error("Compaction failed: %s", exc)
 
 
+_cycle_count = 0
+
 def _collect_loop() -> None:
     """Main collection loop: run forever, poll every COLLECTOR_INTERVAL_SECONDS."""
+    global _cycle_count
     logger.info(
         "Metric collector starting (interval=%ds, LXD_MODE=%s)",
         Config.COLLECTOR_INTERVAL_SECONDS,
@@ -225,6 +228,7 @@ def _collect_loop() -> None:
 
     while True:
         cycle_start = time.monotonic()
+        _cycle_count += 1
 
         try:
             client = get_client()
@@ -266,29 +270,37 @@ def _collect_loop() -> None:
                 tsdb_fields = {k: v for k, v in m.items()
                                if k not in ("container", "status", "ipv4")}
                 try:
-                    write_metric(instance.name, tsdb_fields)
+                    write_metric(instance.name, tsdb_fields, commit=False)
                 except Exception as exc:
-                    logger.warning("TinyFlux write failed for %s: %s", instance.name, exc)
+                    logger.warning("TSDB write failed for %s: %s", instance.name, exc)
+
+        # Batch commit all TSDB writes for this cycle
+        try:
+            from hsm.tsdb import get_tsdb
+            get_tsdb().commit()
+        except Exception as exc:
+            logger.error("Failed to commit TSDB batch: %s", exc)
 
         # Update live cache (for API)
         _update_live_cache(metrics)
         
-        # Sync orphaned containers every cycle to keep DB clean
-        try:
-            from hsm.db import get_db
-            db = get_db()
-            lxd_names = [m["container"] for m in metrics]
-            
-            # Delete any containers from our DB that no longer exist in LXD
-            if lxd_names:
-                placeholders = ",".join(["?"] * len(lxd_names))
-                db.execute(f"DELETE FROM containers WHERE name NOT IN ({placeholders})", lxd_names)
-            else:
-                db.execute("DELETE FROM containers")
+        # Sync orphaned containers every 30 cycles (5 minutes) to keep DB clean without hot loop connection overhead
+        if _cycle_count % 30 == 0:
+            try:
+                from hsm.db import get_db
+                db = get_db()
+                lxd_names = [m["container"] for m in metrics]
                 
-            db.commit()
-        except Exception as exc:
-            logger.warning("Failed to sync orphaned containers: %s", exc)
+                # Delete any containers from our DB that no longer exist in LXD
+                if lxd_names:
+                    placeholders = ",".join(["?"] * len(lxd_names))
+                    db.execute(f"DELETE FROM containers WHERE name NOT IN ({placeholders})", lxd_names)
+                else:
+                    db.execute("DELETE FROM containers")
+                    
+                db.commit()
+            except Exception as exc:
+                logger.warning("Failed to sync orphaned containers: %s", exc)
 
         # Check if compaction is needed
         _run_compaction()
