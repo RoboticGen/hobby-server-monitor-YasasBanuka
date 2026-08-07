@@ -59,10 +59,13 @@ logger = logging.getLogger("hsm.collector")
 LIVE_CACHE_PATH = os.environ.get("LIVE_CACHE_PATH", "data/live_cache.json")
 
 # Track the last time we ran compaction (to avoid running it more than once/day)
-_last_compaction_date: str | None = None
+_last_compaction_date: Optional[str] = None
 
 # Track previous network counters for rate calculation
-_prev_net: dict = {}
+_prev_net: dict[str, dict] = {}
+
+# Track container boot times to avoid heavy 'exec' calls for uptime
+_container_boot_times: dict[str, float] = {}
 
 
 def _collect_one(instance) -> dict | None:
@@ -157,7 +160,26 @@ def _collect_one(instance) -> dict | None:
 
     # ── Status code (LXD numeric codes) ───────────────────────────────────────
     # 102 = Stopped, 103 = Running, 110 = Frozen, 111 = Error
-    status_code = instance.status_code
+    status_code = getattr(instance, "status_code", 102)
+
+    # ── Uptime Calculation ────────────────────────────────────────────────────
+    uptime_seconds = 0.0
+    if instance.status == "Running":
+        if instance.name not in _container_boot_times:
+            # Fetch actual uptime once to avoid heavy 'exec' on every cycle
+            try:
+                res = instance.execute(["cat", "/proc/uptime"])
+                if res.exit_code == 0:
+                    current_uptime = float(res.stdout.split()[0])
+                    _container_boot_times[instance.name] = time.monotonic() - current_uptime
+                else:
+                    _container_boot_times[instance.name] = time.monotonic()
+            except Exception:
+                _container_boot_times[instance.name] = time.monotonic()
+                
+        uptime_seconds = time.monotonic() - _container_boot_times[instance.name]
+    else:
+        _container_boot_times.pop(instance.name, None)
 
     return {
         "container": instance.name,
@@ -174,10 +196,7 @@ def _collect_one(instance) -> dict | None:
         "net_rx_rate_bps": float(rx_rate),
         "net_tx_rate_bps": float(tx_rate),
         "process_count": float(process_count),
-        # LXD does not expose an efficient 'started_at' timestamp via state().
-        # Executing 'cat /proc/uptime' in every container every 10s is too heavy.
-        # Returning 0.0 forces the frontend to display '--' instead of 56 years.
-        "uptime_seconds": 0.0,
+        "uptime_seconds": float(uptime_seconds),
     }
 
 
