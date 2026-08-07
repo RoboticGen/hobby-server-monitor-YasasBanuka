@@ -270,6 +270,10 @@ class ContainerCollectionResource:
             "INSERT OR IGNORE INTO containers (name, description, owner_id) VALUES (?, ?, ?)",
             (validated["name"], validated["description"], user["id"]),
         )
+        db.execute(
+            "INSERT OR IGNORE INTO container_assignments (user_id, container_name) VALUES (?, ?)",
+            (user["id"], validated["name"]),
+        )
         db.commit()
 
         _audit(user["id"], user["email"], "container.create", validated["name"], {
