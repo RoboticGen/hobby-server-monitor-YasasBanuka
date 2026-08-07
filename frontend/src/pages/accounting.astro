@@ -308,8 +308,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
 
     const times = history.map(d => new Date(d.time).getTime() / 1000);
-    const cpuVals = history.map(d => d.cpu_percent);
-    const ramVals = history.map(d => d.mem_used_mb);
+    const cpuVals = history.map(d => d.cpu_usage_pct);
+    const ramVals = history.map(d => d.ram_used_mb);
 
     const optsBase = {
       width: cpuBox.clientWidth - 20,
