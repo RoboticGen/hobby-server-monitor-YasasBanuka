@@ -605,14 +605,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   // Initialize
   (async () => {
     await loadCurrentUser();
-    await loadContainers();
-    await pollMetrics();
+    await loadContainers();   // Initial load of container config (from LXD)
+    await pollMetrics();      // Initial live metrics
 
-    // Poll periodically
+    // ── Polling strategy ────────────────────────────────────────────────────
+    // Container LIST (names, images, limits) changes rarely — refresh every 60s.
+    // This is the call that talks to LXD; keeping it slow means LXD load does
+    // NOT scale with how many browser tabs are open.
     setInterval(async () => {
       await loadContainers();
+    }, 60000);
+
+    // Live METRICS (CPU%, RAM MB, net rate) need to be fresh — refresh every 15s.
+    // This call reads the JSON cache written by the collector — it never touches LXD.
+    // Cost: O(1) file read, regardless of number of containers or browser tabs.
+    setInterval(async () => {
       await pollMetrics();
-    }, 10000);
+    }, 15000);
   })();
 
   // Cleanup on page unload
