@@ -346,6 +346,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const userRes = await fetch('/api/users/me');
       if (!userRes.ok) return;
       const user = await userRes.json();
+      if (user.role !== 'admin') return;
 
       document.getElementById('btn-edit-config').style.display = 'block';
 

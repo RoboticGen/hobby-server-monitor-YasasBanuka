@@ -301,6 +301,7 @@ class ContainerResource:
         meta = db.execute("SELECT * FROM containers WHERE name = ?", (name,)).fetchone()
         resp.media = _serialize_instance(instance, dict(meta) if meta else None)
 
+    @require_role("admin")
     def on_patch(self, req: falcon.Request, resp: falcon.Response, name: str) -> None:
         """Update container config or trigger a lifecycle action."""
         user = req.context.user
