@@ -60,7 +60,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         </div>
         <div id="terminal-ui">
           <div id="terminal-output" class="terminal-output" aria-live="polite" aria-label="Terminal output">
-            <span class="terminal-line terminal-info">Ready. Type a command and press Enter.</span>
+            <div class="terminal-line terminal-info">Ready. Type a command and press Enter.</div>
           </div>
           <form id="terminal-form" class="terminal-input-row" autocomplete="off">
             <span class="terminal-prompt">$</span>
@@ -574,9 +574,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   const termOutput = document.getElementById('terminal-output');
 
   function appendLine(text, cls) {
-    const line = document.createElement('span');
+    const line = document.createElement('div');
     line.className = `terminal-line ${cls}`;
-    line.textContent = text;
+    line.textContent = text.replace(/\n$/, '');
     termOutput.appendChild(line);
     termOutput.scrollTop = termOutput.scrollHeight;
   }
