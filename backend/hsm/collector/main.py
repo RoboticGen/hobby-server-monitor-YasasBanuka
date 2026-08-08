@@ -143,11 +143,18 @@ def _collect_one(instance) -> dict | None:
     interval = now - prev.get("time", now - Config.COLLECTOR_INTERVAL_SECONDS)
 
     if prev and interval > 0:
-        rx_rate = max(0, (net_rx_bytes - prev.get("rx", 0)) / interval)
-        tx_rate = max(0, (net_tx_bytes - prev.get("tx", 0)) / interval)
-        
-        # CPU usage rate = (nanoseconds difference) / interval / 1e9
-        cpu_usage_pct = max(0.0, ((cpu_ns - prev.get("cpu", 0)) / interval) / 1e9 * 100.0)
+        # Detect restart: if CPU nanoseconds drop, the container was restarted
+        if cpu_ns < prev.get("cpu", 0) or net_rx_bytes < prev.get("rx", 0):
+            _container_boot_times.pop(instance.name, None)
+            rx_rate = 0.0
+            tx_rate = 0.0
+            cpu_usage_pct = 0.0
+        else:
+            rx_rate = max(0, (net_rx_bytes - prev.get("rx", 0)) / interval)
+            tx_rate = max(0, (net_tx_bytes - prev.get("tx", 0)) / interval)
+            
+            # CPU usage rate = (nanoseconds difference) / interval / 1e9
+            cpu_usage_pct = max(0.0, ((cpu_ns - prev.get("cpu", 0)) / interval) / 1e9 * 100.0)
     else:
         rx_rate = 0.0
         tx_rate = 0.0
