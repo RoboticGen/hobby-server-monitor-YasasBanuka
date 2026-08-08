@@ -43,3 +43,30 @@ jobs:
       - name: Verify Build
         run: npm run build
         working-directory: ./frontend
+
+  deploy:
+    name: Continuous Deployment (CD)
+    needs: [backend-lint, frontend-build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /opt/hsm
+            # Stash any local changes to prevent merge conflicts
+            sudo git stash
+            sudo git pull origin main
+            
+            # Rebuild frontend
+            cd /opt/hsm/frontend
+            sudo npm install
+            sudo npm run build
+            
+            # Restart backend services
+            sudo systemctl restart hsm-api
+            sudo systemctl restart hsm-collector
