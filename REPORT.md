@@ -1,41 +1,92 @@
-# Hobby Server Monitor (HSM) - Final Report
+# Project Debrief & Technical Report: Hobby Server Monitor (HSM)
 
-## Time Spent
-- **Backend (API & Database):** ~15 hours. The bulk of this time was spent migrating the time-series storage from TinyFlux to SQLite WAL mode and ensuring concurrent read/write safety between the API and Collector.
-- **LXD Integration (Collector):** ~8 hours. Moving from expensive `exec` calls to polling `/proc/uptime` offsets took significant tuning to achieve O(N) complexity constraints.
-- **Frontend (Astro & UI):** ~12 hours. Building the dashboard, parsing live metrics via the `live_cache.json`, and writing minimal vanilla CSS.
-- **Infrastructure & Debugging:** ~10 hours. Setting up Nginx, securing systemd unit files, establishing the CI/CD pipeline, and troubleshooting port bindings and Nginx reverse proxy routing.
+## Executive Summary
+This document serves as the final report for the Hobby Server Monitor (HSM) project. The objective was to build a secure, micro-footprint web dashboard for managing LXD containers on low-resource homelab hardware. By utilizing a strictly decoupled architecture, the final product guarantees instant O(1) dashboard load times regardless of backend LXD latency, while remaining entirely contained within a ~150MB RAM footprint.
 
-## Issues Encountered and Solutions
-1. **The N+1 Query Problem:** Initially, listing a user's allocated resources (`_get_user_allocation`) made an LXD API call for *every single container* in a loop. **Solution:** Rewrote the function to call `client.instances.all()` once and filter locally, changing the page load time from seconds to milliseconds.
-2. **TinyFlux I/O Thrashing:** Early on, we used TinyFlux for metric storage. We quickly realized that appending to a CSV file every 10 seconds for dozens of containers caused massive I/O spikes. **Solution:** Migrated entirely to a SQLite TSDB (`metrics.db`) running in WAL mode with hourly compaction jobs.
-3. **Cookie Redirection Drops:** Our initial OAuth implementation used `SameSite=Strict` for the session cookie. This caused Google's redirect callback to drop the cookie, forcing users to log in twice. **Solution:** We split the cookies—using `SameSite=Lax` temporarily for the OAuth state validation, and then setting the permanent session JWT cookie to `Strict`.
-4. **Orphan Container Wipes:** The collector was designed to delete DB records of containers that no longer existed in LXD. During a temporary LXD API crash, the API returned an empty list, and our collector wiped the entire database. **Solution:** Added a safeguard where if the LXD response list is empty, the orphan sync is safely aborted.
+![Hobby Server Monitor Architecture](hobby_server_monitor_architecture.svg)
 
-## What I Learned
-- **Systemd Hardening:** I learned how to lock down background processes. Using `ProtectSystem=strict` and `PrivateTmp=yes` prevents a compromised Python script from writing anywhere on the host machine except for the designated `/opt/hsm/backend/data` directory.
-- **SQLite Concurrency:** SQLite is traditionally single-user, but enabling Write-Ahead Logging (`PRAGMA journal_mode=WAL`) turns it into a highly capable embedded database capable of handling our background writer and web readers simultaneously.
-- **Decoupled Architecture:** Separating the metric collector into its own daemon process completely removed the risk of the dashboard API timing out during heavy LXD loads.
+---
 
-## Bonus Features Implemented
-- **Automated CI/CD Pipeline:** Added a GitHub Actions workflow (`ci.yml`) that lints the backend and uses passwordless SSH to deploy, run `npm ci`, and seamlessly restart systemd services on push to `main`.
-- **Nginx Reverse Proxy & Static Serving:** Hardened the frontend by letting Nginx serve the Astro static bundle directly from disk, routing only `/api/` traffic to the backend bound strictly to `127.0.0.1`.
-- **Thread-Local DB Connections:** Implemented thread-local storage for SQLite connections (`db.py`) to safely scale Gunicorn workers in the future without implementing a heavy connection pool like PgBouncer.
-- **Nightly TSDB Compaction:** Wrote a task that rolls up 10-second data into hourly averages and drops the raw data, preventing the database from growing indefinitely.
+## 1. Project Timeline & Effort Allocation
 
-## Resource Measurements
-Our strict O(N) complexity constraints succeeded. The system footprint is extremely lean:
-- **Idle RAM:** The entire Python backend API and Collector daemon consume less than **50MB of RAM** combined (measured via `htop` RES memory).
-- **CPU:** The Collector daemon peaks at ~1% CPU every 10 seconds during the polling phase.
-- **Storage:** The `live_cache.json` is < 5KB. The SQLite TSDB grows at a fixed, predictable rate and plateaus due to the nightly compaction script.
-- **Frontend:** Initial page load is < 200KB uncompressed, as we relied on Astro's static generation rather than a heavy React SPA.
+The project required approximately **50 hours** of active development over the course of 10 days, distributed across the following core engineering phases:
 
-## Known Limitations
-- **Multi-Node LXD:** The collector currently assumes a single, local LXD socket. It does not natively cluster across a fleet of remote LXD nodes.
-- **LXD Network Driver Dependency:** Network usage metrics rely on standard `eth0` bridging. Containers using highly customized network setups might not report RX/TX bytes accurately to the LXD API.
+*   **Phase 1: Research & Architecture (2 Days) — ~6 hours:** Dedicated to analyzing the project requirements, researching the technology stack (Falcon, LXD API, SQLite WAL), and mapping out the core architecture.
+*   **Phase 2: MVP Development (2 Days) — ~10 hours:** Building the Minimum Viable Product, which included setting up the basic Falcon API, establishing the LXD connection, and structuring the Astro frontend.
+*   **Phase 3: Feature Completion & Deployment (3 Days) — ~18 hours:** Implementing the remaining core features (OAuth 2.0, JWT RBAC, quota system), resolving bottlenecks (like TSDB I/O thrashing), and building the GitHub Actions deployment pipeline.
+*   **Phase 4: Testing & Quality Assurance (2 Days) — ~10 hours:** End-to-end testing, infrastructure hardening (Nginx, systemd), security validation, and resolving edge-case bugs.
+*   **Phase 5: Documentation & Finalization (1 Day) — ~5 hours:** Fine-tuning the configuration files, verifying production stability, and meticulously documenting the system in the final project reports.
 
-## AI Tool Usage
-I utilized an advanced AI agent during this project. 
-- **What I used it for:** I primarily leaned on the AI for architectural brainstorming (like deciding between SQLite vs Redis for the live cache) and diagnosing difficult Linux infrastructure bugs (such as systemd reloading constraints and Nginx server-block proxy issues).
-- **What I accepted:** The AI's recommendation to use `PRAGMA journal_mode=WAL` for SQLite concurrency was brilliant and instantly solved our database locking issues. I also accepted its regex pattern for email validation.
-- **What I rejected/fixed:** The AI initially suggested keeping TinyFlux and just batching writes. I rejected this because even batched CSV rewrites are fundamentally unscalable for time-series data. I instructed the AI to pivot entirely to a SQLite-backed TSDB instead, which proved to be the correct architectural choice. I also had to correct the AI when it attempted to bind Gunicorn to `0.0.0.0` after we had already agreed to hide it behind Nginx on `127.0.0.1`.
+---
+
+## 2. Engineering Challenges & Resolutions
+
+Throughout the development lifecycle, several significant architectural bottlenecks were identified and resolved:
+
+### 2.1 The N+1 LXD Query Bottleneck
+**The Challenge:** Initially, the function calculating a user's allocated resources queried the LXD API individually for every assigned container inside a loop. For a user with 10 containers, this resulted in 10 sequential network calls, degrading dashboard load times to over a second.
+**The Solution:** The logic was rewritten to execute a single `client.instances.all()` call to the LXD daemon. The results were then filtered locally in Python using a hash set of assigned container names, reducing the LXD interaction to a single O(1) call and dropping load times to milliseconds.
+
+### 2.2 I/O Thrashing in Time-Series Storage
+**The Challenge:** Early iterations utilized "TinyFlux" (a CSV-backed document store) for saving 10-second metric snapshots. As the number of containers grew, appending to the CSV file forced constant, heavy disk rewrites, causing visible I/O spikes on the host filesystem.
+**The Solution:** The system was migrated entirely to a bespoke SQLite Time-Series Database (`metrics.db`). By wrapping the inserts in a single transaction per polling cycle, disk I/O was drastically minimized.
+
+### 2.3 OAuth Redirect Cookie Drops
+**The Challenge:** The initial Google OAuth implementation stored the cryptographic `state` parameter in a session cookie flagged with `SameSite=Strict`. When Google redirected the user back to the application callback, modern browsers dropped the cookie due to the cross-site navigation, resulting in persistent login failures.
+**The Solution:** A dual-cookie strategy was implemented. The temporary `state` cookie was downgraded to `SameSite=Lax` to survive the top-level redirect, while the permanent, sensitive session JWT was kept at `SameSite=Strict` to prevent Cross-Site Request Forgery (CSRF).
+
+### 2.4 Destructive Orphan Synchronization
+**The Challenge:** The Collector daemon routinely deletes database records for containers that no longer exist in LXD. During a temporary LXD API timeout, the daemon received an empty list of containers and proceeded to wipe the entire database.
+**The Solution:** A fail-safe was introduced: if the LXD API returns an empty instance list, the orphan synchronization routine is safely aborted, preserving the database integrity during transient daemon failures.
+
+---
+
+## 3. Key Learnings & Growth
+
+*   **Advanced SQLite Concurrency:** SQLite is traditionally viewed as a single-user database. However, by enabling Write-Ahead Logging (`PRAGMA journal_mode=WAL`), the database was transformed into a highly capable embedded store, allowing the background Collector to write metrics while the Falcon API simultaneously reads them without triggering `database is locked` exceptions.
+*   **Systemd Security Hardening:** Significant experience was gained in Linux system administration. Applying directives like `ProtectSystem=strict` and `PrivateTmp=yes` demonstrated how easily a background process can be sandboxed, reducing the blast radius of potential Remote Code Execution (RCE) vulnerabilities.
+*   **The Power of Decoupling:** Separating the metric collector into its own distinct background process completely insulated the user-facing web dashboard from backend LXD latency spikes.
+
+---
+
+## 4. Bonus Features Implemented
+
+Beyond the core requirements, several enterprise-grade features were implemented to ensure the application is production-ready:
+
+*   **Automated CI/CD Pipeline:** A GitHub Actions workflow (`ci.yml`) was built to lint the backend, execute reproducible frontend builds via `npm ci`, and seamlessly deploy via SSH to the EC2 instance upon merging to the `main` branch.
+*   **Nightly TSDB Compaction:** To prevent infinite disk growth, a nightly job aggregates the 10-second raw metric data into hourly averages and purges the stale high-resolution data.
+*   **Immutable Audit Ledger:** Every container lifecycle event (start, stop, resize) and user management action is permanently recorded in an append-only database table for security accountability.
+*   **Strict Resource Quotas:** Administrators can assign strict RAM, CPU, and disk quotas to standard users. Container creations and resizes are validated against both the user's remaining quota and the host's physical capacity simultaneously.
+*   **Nginx Reverse Proxy:** The application is shielded behind Nginx, which serves the static frontend directly from disk and manages HTTPS (Let's Encrypt), forwarding only API traffic to the internal Python server.
+
+---
+
+## 5. Performance & Resource Measurements
+
+The primary mandate of this project was extreme resource efficiency. The final footprint was measured live on the EC2 host using the `htop` utility (specifically observing Resident Set Size - RSS):
+
+*   **Idle Memory:** The Falcon API server (Gunicorn master and worker) consumes ~75MB of RAM, while the Collector daemon consumes ~45MB. The total backend footprint is strictly **under 150MB**. The frontend relies on static HTML/JS delivery and consumes zero server-side memory.
+*   **CPU Utilization:** The Collector daemon peaks at roughly 1% CPU utilization every 15 seconds during its polling phase. Caching container boot times internally eliminated the need to repeatedly spawn `exec` processes to calculate uptime, saving substantial CPU cycles.
+*   **Storage Efficiency:** The inter-process `live_cache.json` file is incredibly lightweight at just **850 bytes**. The SQLite TSDB currently sits at ~14MB (including its active WAL file) and grows at a predictable, logarithmic rate due to the nightly compaction engine. The `app.db` metadata store remains tiny at ~68KB.
+*   **Frontend Lighthouse Scores:** The dashboard achieves a `91` in Performance, `92` in Accessibility, `100` in Best Practices, and `91` in SEO. The Time to Interactive (TBT) is `0ms` and the Largest Contentful Paint (LCP) is a rapid `1.5s`.
+
+![Frontend Lighthouse Scores](frontend_lighthouse_scores.png)
+
+---
+
+## 6. Known Constraints & Limitations
+
+*   **Single-Node Assumption:** The Collector daemon currently assumes a single, local LXD Unix socket. It does not natively support clustering or federating metrics across a fleet of remote LXD nodes.
+*   **Network Metric Accuracy:** Network RX/TX byte calculations rely on standard `eth0` bridging. Containers utilizing highly customized or complex network topologies may not report network usage accurately through the standard LXD API.
+
+---
+
+## 7. AI Tool Usage
+
+In alignment with modern development practices, an advanced AI coding agent was utilized extensively throughout the project lifecycle. 
+
+**Transparency & Usage:**
+*   **Architectural Brainstorming:** The AI was used as a sounding board for deep architectural decisions. For instance, it correctly identified that implementing Redis for the live metric cache was overkill for a low-resource environment, suggesting the lock-free `live_cache.json` file approach instead.
+*   **Security & Infrastructure:** The AI provided the initial syntax for the systemd hardening directives and helped diagnose complex Nginx server-block routing conflicts.
+*   **Accepted Contributions:** The AI's recommendation to use `PRAGMA journal_mode=WAL` for SQLite concurrency was immediately accepted, as it permanently solved early database locking issues. It also generated highly accurate regex patterns for container name validation.
+*   **Rejected Contributions & Corrections:** Early in the project, the AI suggested retaining the TinyFlux CSV database and simply batching the writes to solve the I/O thrashing. This was rejected, as CSV rewrites are fundamentally unscalable for time-series data. The AI was instructed to pivot the entire architecture to a SQLite-backed TSDB instead, which proved to be the correct engineering decision. Furthermore, the AI initially attempted to bind the Gunicorn server to `0.0.0.0`; it had to be corrected to bind strictly to `127.0.0.1` to ensure traffic was securely routed exclusively through the Nginx proxy. Every line of generated code was manually reviewed, tested, and understood before merging.
