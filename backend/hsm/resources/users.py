@@ -20,6 +20,7 @@ import json
 import urllib.request
 import urllib.error
 import os
+import re
 
 import falcon
 
@@ -93,7 +94,7 @@ class UserCollectionResource:
         body = req.media or {}
 
         email = str(body.get("email", "")).strip().lower()
-        if not email or "@" not in email:
+        if not email or not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
             raise falcon.HTTPBadRequest(
                 title="Invalid email",
                 description="A valid email address is required.",

@@ -14,7 +14,7 @@ from __future__ import annotations
 import falcon
 from falcon import App
 
-from hsm.auth.middleware import AuthMiddleware
+from hsm.auth.middleware import AuthMiddleware, require_role
 from hsm.auth.oauth import OAuthLoginResource, OAuthCallbackResource, LogoutResource
 from hsm.resources.containers import (
     ContainerCollectionResource,
@@ -47,13 +47,9 @@ class HealthResource:
 class AuditLogResource:
     """GET /api/audit — recent audit log entries. Admin only."""
 
+    @require_role("admin")
     def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
-        from hsm.auth.middleware import require_role
         from hsm.db import get_db
-
-        user = req.context.user
-        if user["role"] != "admin":
-            raise falcon.HTTPForbidden()
 
         db = get_db()
         limit = min(500, int(req.get_param("limit") or 100))
@@ -159,7 +155,11 @@ def create_app() -> App:
                 if not path:
                     path = "index.html"
 
-                full_path = os.path.join(abs_static_path, path)
+                full_path = os.path.realpath(os.path.join(abs_static_path, path))
+                
+                # Prevent path traversal (including encoded bypasses)
+                if not full_path.startswith(os.path.realpath(abs_static_path)):
+                    raise falcon.HTTPForbidden()
 
                 if os.path.isdir(full_path):
                     full_path = os.path.join(full_path, "index.html")
