@@ -12,7 +12,7 @@ Design decisions:
    causes a logged warning, not a crash. The collector sleeps and retries.
 
 3. Constant cost: Collection cost is O(containers), never O(browser_tabs).
-   The collector writes to TinyFlux and updates an in-memory cache. The API
+   The collector writes to SQLite TSDB and updates an in-memory cache. The API
    reads the cache. No persistent connections are held.
 
 4. Live cache sharing: The collector and the API run in separate processes,
@@ -292,7 +292,7 @@ def _collect_loop() -> None:
             if m:
                 metrics.append(m)
 
-                # Write to TinyFlux (persist to disk)
+                # Write to TSDB (persist to disk)
                 tsdb_fields = {k: v for k, v in m.items()
                                if k not in ("container", "status", "ipv4")}
                 try:
@@ -321,8 +321,8 @@ def _collect_loop() -> None:
                 if lxd_names:
                     placeholders = ",".join(["?"] * len(lxd_names))
                     db.execute(f"DELETE FROM containers WHERE name NOT IN ({placeholders})", lxd_names)
-                else:
-                    db.execute("DELETE FROM containers")
+                # We intentionally do not delete all containers if lxd_names is empty,
+                # to prevent wiping the DB during temporary LXD API unavailability.
                     
                 db.commit()
             except Exception as exc:

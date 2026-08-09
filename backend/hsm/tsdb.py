@@ -142,8 +142,10 @@ def get_metric_history(
     end_str = end_time.isoformat()
     
     # Query all points in range
+    # Safe string formatting: 'table' is strictly chosen from a literal whitelist
+    query = f"SELECT * FROM {table} WHERE container = ? AND time >= ? AND time <= ? ORDER BY time ASC"
     rows = db.execute(
-        f"SELECT * FROM {table} WHERE container = ? AND time >= ? AND time <= ? ORDER BY time ASC",
+        query,
         (container_name, start_str, end_str)
     ).fetchall()
     

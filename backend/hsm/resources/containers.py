@@ -51,14 +51,22 @@ def _get_user_allocation(user_id: int) -> dict:
     if not assignments:
         return {"ram_mb": 0, "cpu_cores": 0, "disk_gb": 0}
 
+    assigned_names = {row["container_name"] for row in assignments}
     client = get_client()
     total_ram_mb = 0
     total_cpu_cores = 0
     total_disk_gb = 0
 
-    for row in assignments:
+    try:
+        all_instances = client.instances.all()
+    except Exception:
+        all_instances = []
+
+    for instance in all_instances:
+        if instance.name not in assigned_names:
+            continue
+            
         try:
-            instance = client.instances.get(row["container_name"])
             config = instance.config
             # Parse limits.memory (e.g. "1024MB" → 1024)
             mem_str = config.get("limits.memory", "0MB")
@@ -82,7 +90,7 @@ def _get_user_allocation(user_id: int) -> dict:
                         total_disk_gb += int(size_str[:-2])
 
         except Exception:
-            pass  # Container might have been deleted from LXD externally
+            pass  # Handle any individual instance errors safely
 
     return {
         "ram_mb": total_ram_mb,
