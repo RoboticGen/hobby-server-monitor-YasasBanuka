@@ -90,3 +90,21 @@ In alignment with modern development practices, an advanced AI coding agent was 
 *   **Security & Infrastructure:** The AI provided the initial syntax for the systemd hardening directives and helped diagnose complex Nginx server-block routing conflicts.
 *   **Accepted Contributions:** The AI's recommendation to use `PRAGMA journal_mode=WAL` for SQLite concurrency was immediately accepted, as it permanently solved early database locking issues. It also generated highly accurate regex patterns for container name validation.
 *   **Rejected Contributions & Corrections:** Early in the project, the AI suggested retaining the TinyFlux CSV database and simply batching the writes to solve the I/O thrashing. This was rejected, as CSV rewrites are fundamentally unscalable for time-series data. The AI was instructed to pivot the entire architecture to a SQLite-backed TSDB instead, which proved to be the correct engineering decision. Furthermore, the AI initially attempted to bind the Gunicorn server to `0.0.0.0`; it had to be corrected to bind strictly to `127.0.0.1` to ensure traffic was securely routed exclusively through the Nginx proxy. Every line of generated code was manually reviewed, tested, and understood before merging.
+
+---
+
+## 8. Architectural Decisions (Q&A)
+
+In reference to the core decisions posed by the project specification, the following choices were made to optimize for security and resource efficiency:
+
+**1. Where in your system does an authorization decision get made, and how do you stop an endpoint written next month from missing it?**
+Authorization is enforced globally at the middleware layer using a strict `@require_role()` decorator pattern in the Falcon API. By centralizing this logic, any new endpoint added to the application inherently fails closed unless it is explicitly decorated with an allowed role, preventing developers from accidentally shipping unprotected endpoints.
+
+**2. `pylxd` needs privileged access to LXD. What does that access actually grant, and what did you do about it?**
+LXD Unix socket access grants effective root-level control over the host via privileged containers. To mitigate this catastrophic risk, the Falcon web server explicitly does **not** run as root. It runs as an unprivileged `hsm` service user that is simply a member of the `lxd` group. Furthermore, the web server is heavily sandboxed using `systemd` directives (`ProtectSystem=strict`, `PrivateTmp=yes`) to ensure that even if a vulnerability in the web dashboard is exploited, the attacker has no write access to the host OS.
+
+**3. What is in your metric store after a month of uptime?**
+The SQLite TSDB employs a nightly compaction engine. After a month of uptime, the database will contain high-fidelity 10-second granularity data for only the most recent 24 hours. Any data older than 24 hours is automatically rolled up into hourly averages. This guarantees that the storage size grows at a predictably slow, logarithmic rate rather than expanding linearly to disk exhaustion.
+
+**4. How does the first Admin come to exist, and why can that mechanism not be abused?**
+The initial bootstrap Admin is established using a strict `BOOTSTRAP_ADMIN_EMAIL` environment variable. When this exact email address logs in via Google OAuth for the first time, the database assigns them Admin rights. Because this requires an exact Google SSO validation match, and the target email is securely hidden inside the `.env` file (which is excluded from version control), it cannot be spoofed or triggered by arbitrary external users.
