@@ -3,7 +3,7 @@
 ## Executive Summary
 This document serves as the final report for the Hobby Server Monitor (HSM) project. The objective was to build a secure, micro-footprint web dashboard for managing LXD containers on low-resource homelab hardware. By utilizing a strictly decoupled architecture, the final product guarantees instant O(1) dashboard load times regardless of backend LXD latency, while remaining entirely contained within a ~150MB RAM footprint.
 
-![Hobby Server Monitor Architecture](hobby_server_monitor_architecture.svg)
+![Hobby Server Monitor Architecture](hobby_server_monitor_architecture.png)
 
 ---
 

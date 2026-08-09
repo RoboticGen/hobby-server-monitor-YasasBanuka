@@ -17,7 +17,7 @@ Built with a radically decoupled architecture, HSM guarantees instant dashboard 
 
 ## Architecture
 
-![Hobby Server Monitor Architecture](hobby_server_monitor_architecture.svg)
+![Hobby Server Monitor Architecture](hobby_server_monitor_architecture.png)
 
 **The Decoupled Philosophy:**
 The system is split into two independent components:
