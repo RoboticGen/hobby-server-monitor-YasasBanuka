@@ -4,7 +4,7 @@ HSM is a lightweight, secure dashboard for managing LXD containers on small home
 
 ## Architecture
 
-HSM is split into two main components that communicate via a local file cache and a TinyFlux time-series database.
+HSM is split into two main components that communicate via a local file cache and a SQLite time-series database.
 
 1. **Backend API (`backend/hsm/`)**:
    - Built with **Falcon**, an extremely fast, bare-metal Python web framework.
@@ -15,7 +15,7 @@ HSM is split into two main components that communicate via a local file cache an
 2. **Metric Collector Daemon (`backend/hsm/collector/`)**:
    - A standalone background process that polls LXD every 10 seconds.
    - Writes live metrics to a `live_cache.json` file for fast, lock-free reads by the API.
-   - Persists historical data to **TinyFlux**, a lightweight append-only CSV time-series database.
+   - Persists historical data to a **SQLite-backed TSDB**.
    - Runs a nightly compaction job to roll up 10-second data into hourly averages, preventing unbounded disk growth.
 
 3. **Frontend (`frontend/`)**:
@@ -48,7 +48,7 @@ sudo mkdir -p /opt/hsm /etc/hsm
 sudo chown -R $USER:$USER /opt/hsm /etc/hsm
 
 # Clone the repository
-git clone https://github.com/your-repo/rgen-hobby-server-monitor.git /opt/hsm
+git clone https://github.com/RoboticGen/hobby-server-monitor-YasasBanuka.git /opt/hsm
 
 # Create the backend virtual environment
 cd /opt/hsm/backend
@@ -72,12 +72,7 @@ sudo nano /etc/hsm/hsm.env
 ```
 
 ### 5. Initialize the Database
-```bash
-cd /opt/hsm/backend
-source venv/bin/activate
-export $(cat /etc/hsm/hsm.env | xargs)
-python scripts/init_db.py
-```
+The databases (`data/app.db` and `data/metrics.db`) will be automatically initialized when the backend starts for the first time. No manual script required.
 
 ### 6. Install Systemd Services
 We run the API and Collector as separate systemd units for maximum reliability.
