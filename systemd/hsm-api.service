@@ -1,6 +1,6 @@
 [Unit]
 Description=Hobby Server Monitor — Falcon API
-Documentation=https://github.com/your-repo/rgen-hobby-server-monitor
+Documentation=https://github.com/RoboticGen/hobby-server-monitor-YasasBanuka
 After=network.target lxd.service
 Wants=lxd.service
 
@@ -15,7 +15,7 @@ EnvironmentFile=/etc/hsm/hsm.env
 WorkingDirectory=/opt/hsm/backend
 
 ExecStart=/opt/hsm/backend/venv/bin/gunicorn hsm.wsgi:app \
-    --bind 0.0.0.0:8000 \
+    --bind 127.0.0.1:8000 \
     --workers 1 \
     --timeout 120 \
     --access-logfile - \

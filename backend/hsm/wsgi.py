@@ -2,7 +2,7 @@
 WSGI entrypoint for gunicorn.
 
 Usage:
-  gunicorn hsm.wsgi:app --bind 0.0.0.0:8000 -w 1
+  gunicorn hsm.wsgi:app --bind 127.0.0.1:8000 -w 1
 
 Why -w 1 (single worker)?
   SQLite is not safe for concurrent writers. With a single gunicorn worker,

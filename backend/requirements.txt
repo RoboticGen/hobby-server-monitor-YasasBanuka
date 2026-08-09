@@ -20,6 +20,3 @@ pylxd==2.4.1
 # Environment variable loading
 python-dotenv==1.0.1
 
-# Testing (not needed in production)
-pytest==8.3.5
-pytest-mock==3.14.0

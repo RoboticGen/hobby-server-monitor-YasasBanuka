@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: '20.x'
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         working-directory: ./frontend
       - name: Verify Build
         run: npm run build
@@ -64,7 +64,7 @@ jobs:
             
             # Rebuild frontend
             cd /opt/hsm/frontend
-            sudo npm install
+            sudo npm ci
             sudo npm run build
             
             # Restart backend services

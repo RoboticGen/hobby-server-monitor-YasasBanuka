@@ -1,6 +1,6 @@
 [Unit]
 Description=Hobby Server Monitor — Metric Collector
-Documentation=https://github.com/your-repo/rgen-hobby-server-monitor
+Documentation=https://github.com/RoboticGen/hobby-server-monitor-YasasBanuka
 After=network.target lxd.service
 Wants=lxd.service
 
